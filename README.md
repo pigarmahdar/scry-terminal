@@ -42,9 +42,16 @@ cd scryfall-local
 # Make executable
 chmod +x scryfall
 
-# Optional: add to your PATH
-cp scryfall /usr/local/bin/scryfall
+# Optional: add to your PATH (shim + package both go in the same directory,
+# or keep the package in a directory already on PYTHONPATH)
+mkdir -p /usr/local/lib/scryfall-local
+cp -r scryfall scryfall_cli /usr/local/lib/scryfall-local/
+ln -sf /usr/local/lib/scryfall-local/scryfall /usr/local/bin/scryfall
 ```
+
+`scryfall` is a small executable shim; the implementation lives in the
+`scryfall_cli/` package beside it. Copy both (as above) — the shim finds the
+package relative to its own location, so no `PYTHONPATH` is needed.
 
 ### 3. Search!
 
@@ -116,7 +123,9 @@ Things worth knowing:
   `scryfall reindex` forces a rebuild; `scryfall doctor` reports freshness,
   schema version, FTS5 availability, and row-count parity with the JSONL.
 - **Behaviour is unchanged.** Same commands, same flags, same output, same order.
-  Results are compared against the old path by `tests/parity.py` (193 checks).
+  `tests/parity.py` compares the index against the JSONL scan (221 checks);
+  `tests/cli_golden.py` compares CLI stdout/stderr/exit codes byte-for-byte
+  against a recorded pre-refactor baseline (22 cases).
 - **Fallback is automatic and total.** If `sqlite3`, FTS5, or the trigram tokenizer
   is missing, or the index is stale or corrupt, the tool silently uses the original
   full-file scan. Worst case you get yesterday's speed, never a wrong answer.
@@ -440,6 +449,61 @@ The tool validates your input and gives clear feedback:
 Card data is sourced from [Scryfall](https://scryfall.com), the best open MTG card database. The Oracle cards file contains one entry per unique card (~38,000+ cards).
 
 Bulk data is refreshed every 12–24 hours by Scryfall. Prices become stale after 24 hours, but gameplay data (Oracle text, types, legalities) is stable for weeks.
+
+## Project layout
+
+The tool is a small Python package behind an executable shim:
+
+```
+scryfall              # 18-line executable shim (keeps `chmod +x` + PATH installs working)
+scryfall_cli/
+  __init__.py         # side-effect-free; re-exports the API the tests use
+  state.py            # shared state: paths, MODE/USE_COLOR, DB/DB_MODE/CARDS/FORCE_NO_DB
+  project.py          # slim_card/text_card projections + json/jsonl/csv/tsv emitters
+  store.py            # SQLite sidecar: build, status, open, legacy JSONL loader, query helpers
+  search.py           # search_name/text/type/color/cmc/keyword/general/random/oracle + filters/sort
+  api.py              # Scryfall HTTP API + offline name resolution + fuzzy handler
+  display.py          # pretty-mode rendering + image handler
+  cli.py              # parse_args, command routing, update/reindex/doctor/oracle, main()
+tests/
+  parity.py           # 221 checks: index results == JSONL scan results, ordered
+  cli_golden.py       # 22 cases: CLI stdout/stderr/exit code byte-identical to baseline
+  golden.json         # recorded baseline (pre-refactor single-file behaviour)
+```
+
+**Why a package, not one file.** The script stayed single-file through the
+first feature stage (adding the SQLite index, ~580 lines, without restructuring
+— evidence the file *could* hold it), but two practical costs tipped the
+decision: the parity harness had to load the script by path with
+`SourceFileLoader` because it wasn't importable, and shared mutable globals
+(`MODE`, `DB`, `CARDS`, …) were reachable from anywhere with no single source
+of truth. The package split removes both while keeping the install story almost
+as simple — copy the shim *and* the package directory, or run from the repo.
+Behaviour is protected by the two test gates above; `tests/cli_golden.py`
+exists specifically so a refactor like this can be verified byte-for-byte.
+
+**Module layering** (imports only point downward):
+`state → project → store → search → api/display → cli`. `state` is the only
+module allowed to hold mutable state; everything else reads and writes
+`state.<NAME>` attribute access so every module sees one object (never a
+`from state import MODE` rebound copy).
+
+## Testing
+
+Two gates, both run from the repo root:
+
+```shell
+python3 tests/parity.py        # 221 checks: index results == JSONL scan, ordered
+python3 tests/cli_golden.py     # 22 cases: CLI stdout/stderr/exit byte-identical
+```
+
+`parity.py` proves the SQLite path and the legacy full-scan path return the same
+cards in the same order. `cli_golden.py` replays a recorded baseline of real
+CLI invocations (usage, every search command, validation errors, pretty/json/
+csv modes, `--no-db`, env-var format override, `doctor`) and diffs stdout,
+stderr, and exit code byte-for-byte — the gate that lets a refactor of this size
+be verified instead of trusted. Re-record with `python3 tests/cli_golden.py
+--record` **only** when a behaviour change is intentional.
 
 ## Requirements
 

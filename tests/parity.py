@@ -18,50 +18,44 @@ Usage: python3 tests/parity.py [-v] [pattern]
 Exit code 0 = full parity, 1 = mismatches.
 """
 
-import contextlib
-import importlib.machinery
-import importlib.util
-import io
-import json
 import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCRIPT = os.path.join(os.path.dirname(HERE), "scryfall")
+REPO = os.path.dirname(HERE)
 
-spec = importlib.util.spec_from_loader(
-    "scryfall_cli", importlib.machinery.SourceFileLoader("scryfall_cli", SCRIPT))
-cli = importlib.util.module_from_spec(spec)
-sys.modules["scryfall_cli"] = cli
-# The script guards main() behind __main__, so exec_module only defines things.
-with contextlib.redirect_stdout(io.StringIO()):
-    spec.loader.exec_module(cli)
+# Import the package normally — no path loading, no exec_module tricks.
+# (Stage 1's parity harness had to load the single-file script by path because
+#  it wasn't importable; the package split removed that friction.)
+sys.path.insert(0, REPO)
+import scryfall_cli as cli            # noqa: E402
+from scryfall_cli import state        # noqa: E402  (shared mutable state)
 
 
 def load_both():
     """Populate CARDS (legacy) and DB (index) in one process."""
-    cli.FORCE_NO_DB = True
-    cli.DB_MODE = False
-    cli.DB = None
-    cli.CARDS = []
+    state.FORCE_NO_DB = True
+    state.DB_MODE = False
+    state.DB = None
+    state.CARDS = []
     cli.load_cards()
-    assert cli.CARDS, "legacy path loaded no cards"
-    legacy_counts = len(cli.CARDS)
+    assert state.CARDS, "legacy path loaded no cards"
+    legacy_counts = len(state.CARDS)
 
     conn = cli.open_db()
     assert conn is not None, "could not open sidecar for parity run"
-    cli.DB = conn
+    state.DB = conn
     return legacy_counts
 def run_pair(fn_name, *args, **kwargs):
     """Call cli.<fn> on both paths, returning (legacy_result, db_result)."""
     fn = getattr(cli, fn_name)
 
     # Legacy first
-    cli.DB_MODE = False
+    state.DB_MODE = False
     legacy = list(fn(*args, **kwargs))
 
     # DB second
-    cli.DB_MODE = True
+    state.DB_MODE = True
     db = list(fn(*args, **kwargs))
     return legacy, db
 
@@ -173,9 +167,9 @@ def compare_oracle(case, query):
     """`search_oracle` returns (records, total, mode); compare all three in order."""
     fn = cli.search_oracle
 
-    cli.DB_MODE = False
+    state.DB_MODE = False
     l_recs, l_tot, l_mode = fn(query)
-    cli.DB_MODE = True
+    state.DB_MODE = True
     d_recs, d_tot, d_mode = fn(query)
 
     lp = [(cli.text_card(c), n) for c, n in l_recs]
@@ -217,7 +211,7 @@ def main():
             err_a = None
         except ValueError as ex:
             a, err_a = None, str(ex)
-        cli.DB_MODE = True
+        state.DB_MODE = True
         try:
             b = cli.search_cmc(e)
             err_b = None
@@ -237,7 +231,7 @@ def main():
             ea = None
         except ValueError as ex:
             a, ea = None, str(ex)
-        cli.DB_MODE = True
+        state.DB_MODE = True
         try:
             b = cli.search_color(col)
             eb = None
@@ -252,11 +246,11 @@ def main():
         results.append(compare_oracle("oracle %r" % q, q))
 
     # random: same shape + membership, not identity (it is random)
-    cli.DB_MODE = False
+    state.DB_MODE = False
     r_leg = cli.search_random()
-    cli.DB_MODE = True
+    state.DB_MODE = True
     r_db = cli.search_random()
-    leg_names = {c.get("name") for c in cli.CARDS}
+    leg_names = {c.get("name") for c in state.CARDS}
     ok = (len(r_db) == 1 and isinstance(r_db[0], dict)
           and r_db[0].get("name") in leg_names
           and set(r_db[0]) == set(cli.slim_card(r_leg[0])))
@@ -265,13 +259,14 @@ def main():
 
     # _resolve_card offline behaviour (exact/partial/typo candidate pools).
     # Network step is neutralised so this stays hermetic and fast.
-    orig_api = cli.scryfall_fuzzy
-    cli.scryfall_fuzzy = lambda name: None
+    from scryfall_cli import api as _api
+    orig_api = _api.scryfall_fuzzy
+    _api.scryfall_fuzzy = lambda name: None
     try:
         for q in FUZZY_RESOLVE:
-            cli.DB_MODE = False
+            state.DB_MODE = False
             ca, sa = cli._resolve_card(q)
-            cli.DB_MODE = True
+            state.DB_MODE = True
             cb, sb = cli._resolve_card(q)
             na = (ca or {}).get("name")
             nb = (cb or {}).get("name")
@@ -280,7 +275,7 @@ def main():
                                   "" if ok else "jsonl %r(%.3f) vs db %r(%.3f)"
                                   % (na, sa, nb, sb)))
     finally:
-        cli.scryfall_fuzzy = orig_api
+        _api.scryfall_fuzzy = orig_api
 
     fails = [r for r in results if not r.ok]
     warns = [r for r in results if r.ok and "suspicious" in r.detail]
