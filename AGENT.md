@@ -76,6 +76,7 @@ Run `scryfall <command> "<query>" [flags]` via your shell/bash tool.
 | `price "<name>"` | Market prices, most expensive first | `scryfall price "Force of Will"` |
 | `random` | A random card | `scryfall random` |
 | `image "<name>"` | Download card image PNG/JPG to disk | `scryfall image "Sol Ring" --out /tmp/cards` |
+| `mcp` | Launch Model Context Protocol server on stdio for native agent tool calling | `scryfall mcp` |
 | `reindex` | Rebuild the local search index (rarely needed; see below) | `scryfall reindex` |
 | `doctor` | Report index health/staleness | `scryfall doctor` |
 

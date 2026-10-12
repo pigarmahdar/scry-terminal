@@ -22,3 +22,4 @@ from .display import (  # noqa: F401
     display_card, display_oracle_card, display_api_card, display_price_card,
 )
 from .cli import main, parse_args, VALID_COMMANDS  # noqa: F401
+from .mcp import run_mcp_server  # noqa: F401

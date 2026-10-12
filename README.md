@@ -86,6 +86,35 @@ legality, or prices.
 
 Works out of the box with Open WebUI, Claude Code, Ollama, LM Studio, or any tool that can run a shell command.
 
+### Model Context Protocol (MCP) Server
+
+`scryfall` includes a built-in MCP server running over stdio with **zero external dependencies**:
+
+```shell
+scryfall mcp
+```
+
+Add it to your MCP client configuration (Claude Desktop, Cursor, Windsurf, Claude Code):
+
+**`claude_desktop_config.json`**:
+```json
+{
+  "mcpServers": {
+    "scryfall": {
+      "command": "/path/to/scryfall",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Exposed native tools:
+- `scryfall_oracle`: Canonical card text, mana cost, and types (token-efficient).
+- `scryfall_search`: Search cards with format legality (`legal`), commander color identity (`commander`), and sorting.
+- `scryfall_fuzzy`: Typo-tolerant card name resolution.
+- `scryfall_price`: Market pricing in USD, EUR, and TIX.
+- `scryfall_doctor`: Local SQLite index and cache health check.
+
 ## Command reference
 
 | Command | Description | Example |
@@ -102,6 +131,7 @@ Works out of the box with Open WebUI, Claude Code, Ollama, LM Studio, or any too
 | `price` | Search by name with market prices | `scryfall price "Rhystic Study"` |
 | `image` | Download a card's image (PNG to Desktop) | `scryfall image "Sol Ring"` |
 | `random` | Get a random card | `scryfall random` |
+| `mcp` | Start Model Context Protocol server on stdio | `scryfall mcp` |
 | `update` | Update the Oracle cache from Scryfall | `scryfall update` |
 | `reindex` | Rebuild the local search index | `scryfall reindex` |
 | `doctor` | Report index health and staleness | `scryfall doctor` |

@@ -271,7 +271,7 @@ def handle_update():
              " queries will use the JSONL scan path.")
 
 VALID_COMMANDS = {"name", "text", "type", "color", "cmc", "keyword", "fuzzy", "random",
-                  "search", "price", "image", "update", "reindex", "doctor", "oracle"}
+                  "search", "price", "image", "update", "reindex", "doctor", "oracle", "mcp"}
 
 # ── Index maintenance commands (Option C) ───────────────────────────────
 def handle_reindex():
@@ -419,6 +419,12 @@ def main():
         handle_doctor()
         return
 
+    # MCP server (stdio JSON-RPC 2.0 loop)
+    if command == "mcp":
+        from .mcp import run_mcp_server
+        run_mcp_server()
+        return
+
     # Handle image command (uses API first, local cache as fallback)
     if command == "image":
         load_cards()
@@ -429,10 +435,10 @@ def main():
     if command and command not in VALID_COMMANDS:
         if machine_mode():
             emit_single({"error": "unknown_command", "command": command,
-                         "valid_commands": sorted(VALID_COMMANDS - {"update"})})
+                         "valid_commands": sorted(VALID_COMMANDS - {"update", "mcp"})})
         else:
             print("\n  " + c(fmt("✗ Unknown command '{}'.", command), '1;31'))
-            print(f"  Valid commands: {', '.join(sorted(VALID_COMMANDS - {'update'}))}")
+            print(f"  Valid commands: {', '.join(sorted(VALID_COMMANDS - {'update', 'mcp'}))}")
             print(f"  Use 'scryfall search \"{command} {query}\"' for a general search.\n")
         sys.exit(1)
 
