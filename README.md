@@ -4,10 +4,14 @@
 
 `scry` searches the full Scryfall Oracle database (~38,000 cards) from a local copy on your disk. Results come back in **~50 ms** — fast enough to fire a dozen lookups while you're mid-deckbuild — and the tool works completely offline once installed.
 
+
+
 It's built for two audiences at once:
 
 - **Players** — clean, colour-coded answers for deckbuilding, theorycrafting, and kitchen-table rules questions.
 - **AI agents & scripts** — pipe it and it becomes a JSONL data source: stable fields, warnings on stderr, pure data on stdout. See [AGENT.md](AGENT.md).
+
+For MTG brewers, script writers, and AI assistants who want instant, distraction-free answers, Scry Terminal is an offline diagnostic engine and CLI toolkit that validates card rules, deck architecture, and mana math in sub-50ms—without web bloat, rate limits, or context switching.
 
 ## Install
 
