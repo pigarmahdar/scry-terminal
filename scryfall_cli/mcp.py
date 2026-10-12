@@ -12,7 +12,7 @@ import sys
 from typing import Any
 
 from . import state
-from .api import _resolve_card, scryfall_autocomplete, scryfall_fuzzy
+from .api import resolve_fuzzy
 from .project import slim_card, text_card
 from .search import (
     apply_filters,
@@ -61,8 +61,11 @@ TOOLS = [
         "name": "scryfall_search",
         "description": (
             "Search Magic: The Gathering cards from the local offline database across "
-            "name, oracle text, and type line. Supports format legality, commander color "
-            "identity, and sorting."
+            "name, oracle text, and type line. Note: Matches literal keywords/substrings "
+            "(e.g. 'create a treasure token', 'destroy all creatures', 'flying'). Does not "
+            "support natural language queries like 'creatures with flash' — use 'flash' "
+            "with type='Creature' instead. Supports format legality, commander color identity "
+            "(WUBRG letters or commander card name), and sorting."
         ),
         "inputSchema": {
             "type": "object",
@@ -84,7 +87,10 @@ TOOLS = [
                 },
                 "commander": {
                     "type": "string",
-                    "description": "Optional commander color identity constraint in WUBRG letters (e.g. 'WG', 'UBR')",
+                    "description": (
+                        "Optional commander constraint: either WUBRG color identity letters "
+                        "(e.g. 'WG', 'UBR', 'C') or a commander card name (e.g. 'Kwain, Itinerant Meddler')"
+                    ),
                 },
                 "legal": {
                     "type": "string",
@@ -146,6 +152,37 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {},
+        },
+    },
+    {
+        "name": "scryfall_deck",
+        "description": (
+            "Analyze and audit a Magic: The Gathering decklist (.txt or text lines). "
+            "Returns authoritative ground-truth diagnostics across 4 dimensions: "
+            "1) Vitals & Mana Health (Frank Karsten colored sources vs pip demands, early hurdles), "
+            "2) Table Dynamic (Self-focused vs Targeted vs Symmetrical table influence), "
+            "3) Engine Balance (Fuel enablers vs Payoff reward listeners ratio), "
+            "4) Deck Heritage (Classic Pre-2003, Modern 2003-2014, Contemporary 2015+), "
+            "along with format legality and commander color identity verification."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "deck": {
+                    "type": "string",
+                    "description": "Decklist as multi-line string or file path",
+                },
+                "format": {
+                    "type": "string",
+                    "description": "Target format, e.g. 'commander', 'modern', 'standard' (default: 'commander')",
+                    "default": "commander",
+                },
+                "commander": {
+                    "type": "string",
+                    "description": "Optional commander card name override",
+                },
+            },
+            "required": ["deck"],
         },
     },
 ]
@@ -229,38 +266,12 @@ def _tool_fuzzy(args: dict[str, Any]) -> str:
         raise ValueError("Parameter 'name' cannot be empty.")
 
     load_cards()
-
-    # Step 1: Scryfall API fuzzy check (if reachable)
-    matched_name = None
-    result = scryfall_fuzzy(name)
-    if result and not result.get("error") and isinstance(result.get("name"), str):
-        matched_name = result["name"]
-
-    # Step 2: Autocomplete suggestions
-    suggestions = []
-    if matched_name is None:
-        suggestions = scryfall_autocomplete('"' + name.strip('"') + '"')
-        if not suggestions:
-            suggestions = scryfall_autocomplete(name)
-
-    # Step 3: Local fallback
-    local_fallback_card = None
-    if matched_name is None:
-        candidate, sim = _resolve_card(name)
-        if candidate is not None and sim >= 0.85:
-            local_fallback_card = candidate
-
-    card = None
-    if local_fallback_card is not None:
-        card = local_fallback_card
-    elif matched_name:
-        local = search_name(matched_name, exact=True)
-        card = local[0] if local else (result if result and not result.get("error") else None)
+    resolved = resolve_fuzzy(name)
 
     payload = {
         "query": name,
-        "match": slim_card(card) if card else None,
-        "candidates": suggestions[:10],
+        "match": resolved.get("match"),
+        "candidates": resolved.get("candidates", []),
     }
     return json.dumps(payload, indent=2)
 
@@ -305,12 +316,35 @@ def _tool_doctor(args: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2)
 
 
+def _tool_deck(args: dict[str, Any]) -> str:
+    raw_deck = str(args.get("deck", "")).strip()
+    if not raw_deck:
+        raise ValueError("Parameter 'deck' cannot be empty.")
+    target_format = str(args.get("format", "commander"))
+    commander_override = args.get("commander")
+
+    deck_content = raw_deck
+    deck_name = "Decklist"
+    expanded = os.path.expanduser(raw_deck)
+    if "\n" not in raw_deck and os.path.exists(expanded):
+        deck_name = raw_deck
+        with open(expanded, "r", encoding="utf-8") as f:
+            deck_content = f.read()
+
+    load_cards()
+    from .deck import run_deck_analysis
+    res = run_deck_analysis(deck_content, deck_name=deck_name, target_format=target_format,
+                            commander_override=commander_override)
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+
 TOOL_DISPATCH = {
     "scryfall_oracle": _tool_oracle,
     "scryfall_search": _tool_search,
     "scryfall_fuzzy": _tool_fuzzy,
     "scryfall_price": _tool_price,
     "scryfall_doctor": _tool_doctor,
+    "scryfall_deck": _tool_deck,
 }
 
 

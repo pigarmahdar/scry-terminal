@@ -1,0 +1,71 @@
+// Commander
+1 Tam, Mindful First-Year
+
+// Lands
+15 Island
+15 Plains
+1 Command Tower
+1 Glacial Fortress
+1 Hallowed Fountain
+1 Port Town
+1 Prairie Stream
+1 Reliquary Tower
+
+// Ramp & Rocks
+1 Sol Ring
+1 Arcane Signet
+1 Azorius Signet
+1 Talisman of Progress
+1 Mind Stone
+1 Thought Vessel
+1 Commander's Sphere
+1 Fellwar Stone
+
+// Group Hug & Draw (Fuel)
+1 Howling Mine
+1 Font of Mythos
+1 Kami of the Crescent Moon
+1 Dictate of Kruphix
+1 Temple Bell
+1 Vision Skeins
+1 Words of Wisdom
+1 Secret Rendezvous
+1 Cut a Deal
+1 Folio of Fancies
+1 Prosperity
+1 Skyscribing
+
+// Payoffs (Rewards)
+1 Psychosis Crawler
+1 Chasm Skulker
+1 Triskaidekaphile
+1 Ominous Seas
+1 Nadir Kraken
+1 Body of Knowledge
+1 The Council of Four
+
+// Retro & Color Hacking Tech (Heritage)
+1 Sleight of Mind
+1 Mind Bend
+1 Spectral Shift
+1 Glamerdye
+1 Whim of Volrath
+1 Douse
+1 Insight
+1 Tidal Control
+1 Chill
+
+// Interaction & Protection
+1 Counterspell
+1 Arcane Denial
+1 Swords to Plowshares
+1 Path to Exile
+1 Generous Gift
+1 Stroke of Midnight
+1 Supreme Verdict
+1 Farewell
+1 Teferi's Protection
+1 Ghostly Prison
+1 Propaganda
+1 Windborn Muse
+1 Approach of the Second Sun

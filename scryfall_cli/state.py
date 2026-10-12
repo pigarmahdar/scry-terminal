@@ -10,8 +10,8 @@ import os
 import sys
 
 # ── Path to the Oracle cards cache ──────────────────────────────────────
-ORACLE_PATH = os.path.expanduser("~/.hermes/scryfall/oracle-cards.jsonl")
-DB_PATH = os.path.expanduser("~/.hermes/scryfall/oracle-cards.db")
+ORACLE_PATH = os.environ.get("SCRYFALL_ORACLE_PATH") or os.path.expanduser("~/.hermes/scryfall/oracle-cards.jsonl")
+DB_PATH = os.environ.get("SCRYFALL_DB_PATH") or os.path.expanduser("~/.hermes/scryfall/oracle-cards.db")
 SCHEMA_VERSION = "1"
 
 # ── Output mode (resolved once at startup in main()) ────────────────────

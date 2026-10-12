@@ -89,6 +89,7 @@ from .search import (
 from .api import handle_fuzzy, SCRYFALL_API  # noqa: F401
 from .display import (
     display_card, display_oracle_card, display_price_card, handle_image,
+    display_deck_analysis,
 )
 
 
@@ -98,7 +99,7 @@ def parse_args(args):
     command = None
     query_parts = []
     options = {"limit": 10, "commander": None, "legal": None, "exact": False, "sort": None,
-               "size": None, "out": None, "border": None, "format": None}
+               "size": None, "out": None, "border": None, "format": None, "commander_card": None}
 
     i = 0
     while i < len(args):
@@ -111,6 +112,9 @@ def parse_args(args):
             i += 2
         elif arg == "--commander" and i + 1 < len(args):
             options["commander"] = args[i + 1]
+            i += 2
+        elif arg == "--commander-card" and i + 1 < len(args):
+            options["commander_card"] = args[i + 1]
             i += 2
         elif arg == "--legal" and i + 1 < len(args):
             options["legal"] = args[i + 1]
@@ -270,8 +274,45 @@ def handle_update():
         warn("sqlite3/FTS5 unavailable in this Python build;"
              " queries will use the JSONL scan path.")
 
+def handle_deck(query, options):
+    load_cards()
+    deck_content = ""
+    deck_name = "Decklist"
+
+    if query == "-" or (not query.strip() and not sys.stdin.isatty()):
+        deck_content = sys.stdin.read()
+        deck_name = "Standard Input (stdin)"
+    elif query.strip():
+        expanded = os.path.expanduser(query)
+        if os.path.exists(expanded):
+            deck_name = query
+            with open(expanded, "r", encoding="utf-8") as f:
+                deck_content = f.read()
+        else:
+            deck_content = query
+            deck_name = "Inline Decklist"
+    else:
+        if machine_mode():
+            emit_single({"error": "empty_decklist", "message": "No decklist file or input provided."})
+        else:
+            print('\n  ' + c('✗ No decklist file or input provided.', '1;31'))
+            print("  Usage: scryfall deck <file> | cat deck.txt | scryfall deck\n")
+        sys.exit(1)
+
+    target_format = options.get("legal") or "commander"
+    commander_override = options.get("commander_card")
+    from .deck import run_deck_analysis
+    res = run_deck_analysis(deck_content, deck_name=deck_name, target_format=target_format,
+                            commander_override=commander_override)
+
+    if machine_mode():
+        json.dump(res, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+    else:
+        display_deck_analysis(res)
+
 VALID_COMMANDS = {"name", "text", "type", "color", "cmc", "keyword", "fuzzy", "random",
-                  "search", "price", "image", "update", "reindex", "doctor", "oracle", "mcp"}
+                  "search", "price", "image", "update", "reindex", "doctor", "oracle", "mcp", "deck"}
 
 # ── Index maintenance commands (Option C) ───────────────────────────────
 def handle_reindex():
@@ -431,6 +472,11 @@ def main():
         handle_image(query, options)
         return
 
+    # Handle deck command
+    if command == "deck":
+        handle_deck(query, options)
+        return
+
     # Validate command (#4)
     if command and command not in VALID_COMMANDS:
         if machine_mode():
@@ -512,7 +558,15 @@ def main():
                         p[k] = None
 
     # Apply filters
-    results = apply_filters(results, commander=options["commander"], legal=options["legal"])
+    try:
+        results = apply_filters(results, commander=options["commander"], legal=options["legal"])
+    except ValueError as e:
+        if machine_mode():
+            emit_single({"error": "invalid_commander", "details": str(e)})
+        else:
+            print("\n  " + c(fmt("✗ Invalid commander: {}", e), '1;31'))
+            print("  Usage: --commander WG | --commander 'Kwain, Itinerant Meddler'\n")
+        sys.exit(1)
 
     # Apply sort (#5)
     if options["sort"]:

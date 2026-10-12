@@ -168,25 +168,35 @@ def _resolve_card(query):
     return card, sim
 
 
-# ── Fuzzy command handler (API-first; lives here because it drives the API) ──
-def handle_fuzzy(query, options=None):
-    """Fuzzy search: try fuzzy → if ambiguous/no match, autocomplete → pick → lookup.
+# ── Fuzzy card resolution helper ─────────────────────────────────────────
+def resolve_fuzzy(query):
+    """Resolve a fuzzy card name query with similarity gating, autocomplete, and local fallback.
 
-    In machine mode (json/jsonl/csv/tsv) it is fully non-interactive: emits a
-    single JSON object {query, match, candidates} instead of prompting with
-    input(), which would hang an LLM harness forever.
+    Returns dict with keys:
+      - 'query': original query string
+      - 'match': slim_card dict or None
+      - 'candidates': list of candidate suggestion strings (up to 10)
+      - 'raw_card': full card dict or None
+      - 'raw_result': Scryfall API result dict or None
+      - 'matched_name': name of matched card or None
+      - 'sanity_rejected': bool indicating if upstream fuzzy failed similarity check
     """
-    from .display import display_card, display_api_card  # local: display imports api
     if not query:
-        print("\n  Usage: scryfall fuzzy <card name>")
-        return
+        return {
+            "query": "",
+            "match": None,
+            "candidates": [],
+            "raw_card": None,
+            "raw_result": None,
+            "matched_name": None,
+            "sanity_rejected": False,
+        }
 
     # Step 1: Try Scryfall fuzzy match
-    if not machine_mode():
-        print('\n  ' + c('Searching for:', '1') + ' \"' + query + '\"')
     result = scryfall_fuzzy(query)
 
     matched_name = None
+    sanity_rejected = False
     if result and not result.get("error"):
         name = result.get("name", "Unknown")
         if isinstance(name, str):
@@ -199,9 +209,7 @@ def handle_fuzzy(query, options=None):
             if ratio >= 0.55 or has_word_overlap:
                 matched_name = name
             else:
-                # Fuzzy returned something unrelated — treat as no match
-                if not machine_mode():
-                    print("  " + c(fmt("~ Scryfall suggested '{}' but it doesn't match your query.", name), '1;33') + "\n")
+                sanity_rejected = True
         elif isinstance(name, list):
             # Ambiguous response — resolve to the closest candidate name
             chosen = _api_closest_match(result, query)
@@ -226,33 +234,71 @@ def handle_fuzzy(query, options=None):
                     break
 
     # Step 2b: Local fallback — word-level typo matching against the cache
-    # (rescues queries like "sol rng" / "jac bele" where Scryfall's own fuzzy
-    # endpoint returns nothing useful)
     local_fallback_card = None
     if matched_name is None:
         candidate, sim = _resolve_card(query)
         if candidate is not None and sim >= 0.85:
             local_fallback_card = candidate
 
+    card = None
+    if local_fallback_card is not None:
+        card = local_fallback_card
+    elif matched_name:
+        local = search_name(matched_name, exact=True)
+        card = local[0] if local else (result if result and not result.get("error") else None)
+
+    return {
+        "query": query,
+        "match": slim_card(card) if card else None,
+        "candidates": suggestions[:10],
+        "raw_card": card,
+        "raw_result": result,
+        "matched_name": matched_name or (card.get("name") if card else None),
+        "sanity_rejected": sanity_rejected,
+    }
+
+
+# ── Fuzzy command handler (API-first; lives here because it drives the API) ──
+def handle_fuzzy(query, options=None):
+    """Fuzzy search: try fuzzy → if ambiguous/no match, autocomplete → pick → lookup.
+
+    In machine mode (json/jsonl/csv/tsv) it is fully non-interactive: emits a
+    single JSON object {query, match, candidates} instead of prompting with
+    input(), which would hang an LLM harness forever.
+    """
+    from .display import display_card, display_api_card  # local: display imports api
+    if not query:
+        print("\n  Usage: scryfall fuzzy <card name>")
+        return
+
+    # Step 1: Resolve fuzzy match (shared with MCP)
+    if not machine_mode():
+        print('\n  ' + c('Searching for:', '1') + ' \"' + query + '\"')
+
+    resolved = resolve_fuzzy(query)
+    card = resolved["raw_card"]
+    matched_name = resolved["matched_name"]
+    suggestions = resolved["candidates"]
+    result = resolved["raw_result"]
+
     # ── Machine mode: emit structured result, never prompt ──
     if machine_mode():
-        card = None
-        if local_fallback_card is not None:
-            card = local_fallback_card
-        elif matched_name:
-            local = search_name(matched_name, exact=True)
-            card = local[0] if local else (result if result and not result.get("error") else None)
         payload = {"query": query,
-                   "match": slim_card(card) if card else None,
+                   "match": resolved["match"],
                    "candidates": suggestions[:10]}
         emit_single(payload)
         return
+
+    if resolved.get("sanity_rejected") and result and isinstance(result.get("name"), str):
+        print("  " + c(fmt("~ Scryfall suggested '{}' but it doesn't match your query.", result["name"]), '1;33') + "\n")
 
     if matched_name:
         print('  ' + c('✓ Found:', '1;32') + ' ' + matched_name + '\n')
         local = search_name(matched_name, exact=True)
         if local:
             display_card(local[0])
+        elif card:
+            display_card(card)
         else:
             display_api_card(result)
         return

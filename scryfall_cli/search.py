@@ -264,9 +264,51 @@ def search_random():
     return [rng.choice(state.CARDS)]
 
 # ── Apply filters ───────────────────────────────────────────────────────
+def _resolve_commander_identity(commander):
+    """Resolve a commander constraint to a set of allowed color identity letters (WUBRG).
+
+    Accepts:
+      - WUBRG color identity code (e.g., 'WG', 'UBR', 'WUBRG', 'C' for colorless)
+      - Commander card name (e.g., 'Kwain, Itinerant Meddler', 'Atraxa, Praetors\' Voice')
+
+    Raises ValueError if input cannot be resolved to a valid color identity or card.
+    """
+    if not commander or not str(commander).strip():
+        return set()
+
+    c_str = str(commander).strip()
+    c_upper = c_str.upper()
+
+    # Check for direct WUBRGC color identity string (e.g. 'WG', 'UBR', 'C')
+    if len(c_upper) <= 5 and set(c_upper).issubset({"W", "U", "B", "R", "G", "C"}):
+        return set(c_upper) - {"C"}
+
+    # Attempt to resolve as card name from local cache
+    exact = search_name(c_str, exact=True)
+    if exact:
+        return set(exact[0].get("color_identity", []))
+
+    partial = search_name(c_str, exact=False)
+    if partial:
+        return set(partial[0].get("color_identity", []))
+
+    # Try typo/fuzzy resolution via api._resolve_card if available
+    try:
+        from .api import _resolve_card
+        card, sim = _resolve_card(c_str)
+        if card and sim >= 0.7:
+            return set(card.get("color_identity", []))
+    except Exception:
+        pass
+
+    raise ValueError(
+        f"Invalid commander '{commander}': must be WUBRG color letters (e.g. 'WG', 'UBR') or a known card name."
+    )
+
+
 def apply_filters(results, commander=None, legal=None):
     if commander:
-        allowed = set(commander.upper())
+        allowed = _resolve_commander_identity(commander)
         results = [c for c in results if set(c.get("color_identity", [])).issubset(allowed)]
     if legal:
         legal = legal.lower()

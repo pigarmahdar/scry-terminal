@@ -271,3 +271,119 @@ def handle_image(query, options):
     else:
         size_kb = os.path.getsize(out_path) / 1024
         print('  ' + c('✓ Saved:', '1;32') + ' ' + out_path + '  (' + c(str(round(size_kb)) + ' KB', '2') + ')\n')
+
+
+# ── Deck Analysis Display ───────────────────────────────────────────────
+
+def _bar(pct: float, width: int = 15) -> str:
+    """Generate a simple block bar for percentages."""
+    filled = max(0, min(width, int(round((pct / 100.0) * width))))
+    return "■" * filled
+
+
+def display_deck_analysis(res: dict):
+    """Render the 4 diagnostic pillars and legality vitals to stdout in pretty mode."""
+    if res.get("error"):
+        print('\n  ' + c('✗ Error: ' + res.get("message", "Unknown error"), '1;31') + '\n')
+        return
+
+    name = res.get("deck_name", "Decklist")
+    fmt_name = res.get("format", "commander").title()
+    total_cards = res.get("total_cards", 0)
+    is_legal = res.get("is_legal", False)
+
+    status_str = c('✓ Tournament Legal', '1;32') if is_legal else c('✗ Issues Found', '1;31')
+
+    print(f"\n  {c('Deck Analysis:', '1;37')} {name}")
+    print(f"  Format: {fmt_name} ({total_cards} cards)  ·  Status: {status_str}")
+
+    cmd_name = res.get("commander")
+    if cmd_name:
+        cmd_id = res.get("commander_identity", [])
+        id_str = " ".join(COLOUR_SYMBOLS.get(col, col) for col in cmd_id) if cmd_id else "Colorless"
+        print(f"  Commander: {c(cmd_name, '1;33')} (Identity: {id_str})")
+
+    # Display Errors / Warnings if any
+    audit = res.get("legality_audit", {})
+    banned = audit.get("banned_cards", [])
+    violations = audit.get("color_identity_violations", [])
+    singletons = audit.get("singleton_violations", [])
+    unresolved = res.get("unresolved_cards", [])
+
+    if banned or violations or singletons or unresolved:
+        print(f"\n  {c('ERRORS & WARNINGS:', '1;31')}")
+        for b in banned:
+            print(f"    {c('[BANNED]', '1;31')} {b} is banned in {fmt_name}")
+        for v in violations:
+            off = ", ".join(v.get("off_colors", []))
+            print(f"    {c('[OFF-COLOR]', '1;31')} {v['card']} has off-color identity {{{off}}}")
+        for s in singletons:
+            print(f"    {c('[SINGLETON]', '1;31')} {s}")
+        for u in unresolved:
+            print(f"    {c('[UNRESOLVED]', '1;33')} Could not resolve card: '{u}'")
+
+    # Pillar 1: Vitals & Mana Health
+    mana = res.get("mana_architecture", {})
+    lands = mana.get("lands_count", 0)
+    ramp = mana.get("ramp_count", 0)
+    avg_cmc = mana.get("avg_cmc_nonlands", 0.0)
+    t1_3 = mana.get("turn_1_to_3_playables", 0)
+
+    print(f"\n  {c('[1] Vitals & Mana Health', '1;36')}")
+    print(f"    Lands: {lands}  ·  Rocks/Ramp: {ramp}  ·  Avg Non-Land CMC: {avg_cmc}  ·  Turn 1–3 Density: {t1_3} cards")
+
+    pip_pct = mana.get("pip_pct", {})
+    source_pct = mana.get("source_pct", {})
+    pip_dem = mana.get("pip_demand", {})
+
+    active_colors = [col for col in ("W", "U", "B", "R", "G") if pip_dem.get(col, 0) > 0 or source_pct.get(col, 0) > 0]
+    if active_colors:
+        print(f"    Mana Balance:")
+        for col in active_colors:
+            sym = COLOUR_SYMBOLS.get(col, col)
+            p_p = pip_pct.get(col, 0.0)
+            s_p = source_pct.get(col, 0.0)
+            diff = s_p - p_p
+            note = c("Balanced", "2")
+            if diff < -12.0:
+                note = c("⚠ Deficit", "1;33")
+            elif diff > 15.0:
+                note = c("Surplus", "2")
+            print(f"    {sym} {col}: {_bar(p_p, 10)} {p_p}% pips  vs  {_bar(s_p, 10)} {s_p}% sources ({note})")
+
+    hurdles = mana.get("early_hurdles", [])
+    if hurdles:
+        for h in hurdles:
+            print(f"    {c('⚠ Early Hurdle:', '1;33')} {h['card']} ({h['cost']}) has {h['current_sources']} {h['color']} sources (recommend {h['recommended_sources']}+)")
+
+    # Pillar 2: Table Dynamic (Posture)
+    dyn = res.get("table_dynamic", {})
+    print(f"\n  {c('[2] Table Dynamic & Posture', '1;36')}")
+    print(f"    Self-Focused: {dyn.get('self_pct')}% ({dyn.get('self_count')} cards)  ·  "
+          f"Targeted: {dyn.get('targeted_pct')}% ({dyn.get('targeted_count')} cards)  ·  "
+          f"Symmetrical: {dyn.get('symmetrical_pct')}% ({dyn.get('symmetrical_count')} cards)")
+    print(f"    Posture: {c(dyn.get('posture', ''), '1;35')}")
+
+    # Pillar 3: Engine Balance
+    eng = res.get("engine_profile", {})
+    print(f"\n  {c('[3] Engine Balance (' + eng.get('primary_theme', '') + ')', '1;36')}")
+    fuel = eng.get("fuel_count", 0)
+    payoffs = eng.get("payoff_count", 0)
+    print(f"    Fuel (Enablers):  {_bar(min(100, fuel * 5), 10)} {fuel} cards")
+    print(f"    Payoffs (Spouts): {_bar(min(100, payoffs * 5), 10)} {payoffs} cards")
+    print(f"    Ratio: {eng.get('ratio')} : 1 ({c(eng.get('diagnostic', ''), '2')})")
+
+    # Pillar 4: Deck Heritage & Era Distribution
+    her = res.get("heritage", {})
+    print(f"\n  {c('[4] Deck Heritage & Era Distribution', '1;36')}")
+    print(f"    Classic (Pre-2003): {her.get('classic_pct')}% ({her.get('classic_count')} cards)  ·  "
+          f"Modern Frame: {her.get('modern_pct')}% ({her.get('modern_count')} cards)  ·  "
+          f"Contemporary: {her.get('contemporary_pct')}%")
+    print(f"    Heritage Anchor: {c(her.get('anchor_card', ''), '1;33')}  ·  Est. Median Age: {her.get('median_age_years')} yrs")
+
+    val = res.get("valuation", {})
+    usd = val.get("usd_total", 0.0)
+    top_cards = val.get("top_expensive", [])
+    top_str = ", ".join(f"{name} ${price:.2f}" for name, price in top_cards) if top_cards else "None"
+    print(f"\n  Est. Market USD: {c('$' + f'{usd:.2f}', '1;32')} (Top: {top_str})\n")
+

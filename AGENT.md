@@ -76,12 +76,13 @@ Run `scryfall <command> "<query>" [flags]` via your shell/bash tool.
 | `price "<name>"` | Market prices, most expensive first | `scryfall price "Force of Will"` |
 | `random` | A random card | `scryfall random` |
 | `image "<name>"` | Download card image PNG/JPG to disk | `scryfall image "Sol Ring" --out /tmp/cards` |
+| `deck "<file>"` | Static analysis & diagnostic audit across 4 pillars (mana, dynamic, engine, heritage) | `scryfall deck deck.txt` |
 | `mcp` | Launch Model Context Protocol server on stdio for native agent tool calling | `scryfall mcp` |
 | `reindex` | Rebuild the local search index (rarely needed; see below) | `scryfall reindex` |
 | `doctor` | Report index health/staleness | `scryfall doctor` |
 
 Useful flags: `--limit N` (default 10), `--legal commander|modern|legacy|pauper|vintage`,
-`--commander WUBRG` (identity fits within these colours), `--exact`.
+`--commander WUBRG` (identity fits within these colours), `--exact`, `--commander-card <name>`.
 
 `oracle` ignores `--commander`, `--legal`, and `--sort` (it is a lookup, not a
 browse) and warns on stderr when they are passed. It accepts `--limit`, `--format`,
@@ -129,7 +130,39 @@ empty, tell the user no card was found — do NOT guess a different card.
 
 If `saved` is non-null the file exists on disk at that path — you may open/read
 it as an image. If `error` is `"not_found"` or `"no_image"`, report it; do not
-retry with a made-up name.
+`deck` returns ONE comprehensive diagnostic object:
+
+```json
+{
+  "deck_name": "deck.txt",
+  "commander": "Tam, Mindful First-Year",
+  "commander_identity": ["W", "U"],
+  "format": "commander",
+  "total_cards": 100,
+  "is_legal": true,
+  "unresolved_cards": [],
+  "mana_architecture": {
+    "lands_count": 36, "ramp_count": 8, "avg_cmc_nonlands": 2.94, "turn_1_to_3_playables": 34,
+    "pip_pct": {"W": 32.0, "U": 68.0}, "source_pct": {"W": 34.0, "U": 66.0},
+    "early_hurdles": [{"card": "Counterspell", "cost": "{U}{U}", "current_sources": 17, "recommended_sources": 21}]
+  },
+  "table_dynamic": {
+    "self_pct": 38.0, "targeted_pct": 14.0, "symmetrical_pct": 48.0,
+    "posture": "High Table Influence (Group Hug / Global Rules Engine)"
+  },
+  "engine_profile": {
+    "primary_theme": "Card Draw & Library Manipulation",
+    "fuel_count": 18, "payoff_count": 7, "ratio": 2.57, "diagnostic": "Stable Flow Buffer"
+  },
+  "heritage": {
+    "classic_pct": 41.0, "modern_pct": 25.0, "contemporary_pct": 34.0,
+    "anchor_card": "Sleight of Mind (Pre-2003, Classic Era)", "median_age_years": 17.2
+  },
+  "legality_audit": {
+    "is_legal": true, "banned_cards": [], "color_identity_violations": [], "singleton_violations": []
+  }
+}
+```
 
 All other commands emit JSONL: zero or more card records, one per line.
 

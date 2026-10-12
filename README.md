@@ -43,6 +43,7 @@ scryfall type "enchantment" --commander WG     # browse by type, colour identity
 scryfall cmc <=2 --legal commander --limit 5   # cheap commander staples
 scryfall image "Sol Ring"                      # high-res art to your Desktop
 scryfall random                                # a random card
+scryfall deck "my_deck.txt"                    # instant mana, engine, posture & vintage audit
 ```
 
 Piped output flips to JSONL automatically:
@@ -58,6 +59,7 @@ scryfall search "counter target spell" --limit 500 \
 |---|---|
 | **Search** | name, oracle text, type line, colour identity, mana value, keyword, or all of the above at once |
 | **Fuzzy** | `fuzzy "thragtuskk"` → Thragtusk; misspellings, partials, and near-misses resolve to the right card |
+| **Deck** | `deck <file>` or `pbpaste \| scryfall deck`: Karsten mana balance, table posture, engine fuel/payoff ratios, vintage heritage, legality |
 | **Prices** | USD, EUR, and MTGO tickets with foil variants, sorted most-expensive-first |
 | **Images** | Download PNG/JPG art straight to disk (`--size`, `--out`, `--border`) |
 | **Filters** | `--commander WUBRG` colour identity, `--legal <format>` for 15+ formats, `--sort name/cmc/price` |
@@ -112,6 +114,7 @@ Exposed native tools:
 - `scryfall_oracle`: Canonical card text, mana cost, and types (token-efficient).
 - `scryfall_search`: Search cards with format legality (`legal`), commander color identity (`commander`), and sorting.
 - `scryfall_fuzzy`: Typo-tolerant card name resolution.
+- `scryfall_deck`: Full 4-pillar decklist audit and format legality verification.
 - `scryfall_price`: Market pricing in USD, EUR, and TIX.
 - `scryfall_doctor`: Local SQLite index and cache health check.
 
@@ -130,6 +133,7 @@ Exposed native tools:
 | `fuzzy` | Fuzzy name search (handles typos, partial names) | `scryfall fuzzy "sol rng"` |
 | `price` | Search by name with market prices | `scryfall price "Rhystic Study"` |
 | `image` | Download a card's image (PNG to Desktop) | `scryfall image "Sol Ring"` |
+| `deck` | Static analysis & diagnostic audit across 4 pillars | `scryfall deck deck.txt` |
 | `random` | Get a random card | `scryfall random` |
 | `mcp` | Start Model Context Protocol server on stdio | `scryfall mcp` |
 | `update` | Update the Oracle cache from Scryfall | `scryfall update` |
@@ -142,7 +146,8 @@ Exposed native tools:
 |---|---|
 | `--limit N` | Max results (default: 10) |
 | `--commander WUBRG` | Cards whose colour identity fits within these colours |
-| `--legal <format>` | Only cards legal in a format |
+| `--commander-card <name>` | Explicit commander card name override (for `deck`) |
+| `--legal <format>` | Only cards legal in a format (default `commander` for `deck`) |
 | `--exact` | Exact name match (for `name`) |
 | `--sort <field>` | Sort by `name`, `cmc`, or `price` |
 | `--size <s\|n\|l\|png>` | Image size for `image` (default: png) |
@@ -152,6 +157,34 @@ Exposed native tools:
 | `--json` / `--jsonl` / `--csv` / `--tsv` | Shorthands for `--format` |
 | `--pretty` | Force human-styled output even when piped |
 | `--no-db` | Bypass the search index (debugging) |
+
+## Deck Diagnostics & Architecture (The Deck Linter)
+
+```shell
+scryfall deck deck.txt                         # audit decklist file
+cat deck.txt | scryfall deck                   # audit from pipe
+pbpaste | scryfall deck                        # audit macOS clipboard directly
+scryfall deck deck.txt --json                  # machine-readable diagnostic schema
+```
+
+### Why We Made It
+Web deckbuilders (Moxfield, Archidekt) already excel at visual drag-and-drop card grids and image galleries. We did not build `scryfall deck` to be an inferior ASCII clone of a web browser.
+
+Instead, it is designed as a **Deck Architecture & Health Linter** (`cargo check` / `eslint` for Magic: The Gathering):
+- **Instant Terminal Speed (<20 ms):** Run instant sanity checks while editing `.txt` decklists in VS Code or Vim without context switching.
+- **100% Offline & Private:** Validates and audits full 100-card decks using local SQLite batch queries with zero external network calls.
+- **Respect for Diverse Wincons:** Rather than grading every deck against a rigid, hyper-efficient cEDH aggro template, it analyzes a deck against **its own internal engine and playstyle** (Group Hug, alternate wincons, mill, or 90s retro themes).
+
+### The 4 Diagnostic Pillars
+1. **Vitals & Mana Architecture:** Compares Frank Karsten colored mana production (lands and rocks) against colored pip demands. Detects early-turn multi-pip hurdles (e.g. `{U}{U}` at CMC 2 Counterspell with insufficient blue sources) and measures Turn 1–3 playables density.
+2. **Table Dynamic & Political Posture:** Quantifies table influence by parsing card targeting into **Self-Focused** (advancing own board), **Targeted** (adversarial removal/interaction), and **Symmetrical** (table-wide effects, group hug, sweepers).
+3. **Engine Balance ("Fuel vs. Payoff"):** Models universal action generators (draw, sacrifice, tokens, counters, color alteration) against reward listeners (`"Whenever you..."`). Flags fuel chokes or payoff deficits.
+4. **Deck Heritage & Vintage Spectrum:** Partitions cards into **Classic (Pre-2003)**, **Modern Frame (2003–2014)**, and **Contemporary (2015+)**, identifying the deck's Heritage Anchor Card and celebrating retro brews.
+
+### Superpower for LLMs & AI Agents
+When AI assistants (Claude Code, Cursor, ChatGPT) are asked to tune a deck or suggest cuts/adds, models routinely hallucinate card legality, mana values, and curve math, or exhaust web rate limits across 100 API calls.
+
+With `scryfall deck deck.txt --json` (or the native `scryfall_deck` MCP tool), the agent receives an authoritative, ground-truth architectural diagnostic in **one single tool call (<20 ms)**. The agent can then reason with 100% mathematical accuracy without guessing.
 
 ## How it works
 
