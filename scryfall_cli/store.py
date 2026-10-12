@@ -7,6 +7,7 @@ only module allowed to *write* DB/DB_MODE/CARDS after startup.
 import json
 import os
 import sys
+import time
 
 from . import state
 from .project import slim_card
@@ -195,6 +196,24 @@ def open_db():
         return None
 
 
+def check_cache_age():
+    """Warn on stderr if the JSONL cache is older than 30 days."""
+    if getattr(state, "_CACHE_AGE_WARNED", False):
+        return
+    state._CACHE_AGE_WARNED = True
+    if os.environ.get("SCRYFALL_NO_CACHE_WARN"):
+        return
+    if not os.path.exists(ORACLE_PATH):
+        return
+    try:
+        mtime = os.stat(ORACLE_PATH).st_mtime
+        age_days = int((time.time() - mtime) / 86400)
+        if age_days > 30:
+            warn(f"card cache is {age_days} days old — run 'scryfall update' to refresh")
+    except OSError:
+        pass
+
+
 def load_cards():
     """Ensure card data is available.
 
@@ -204,6 +223,7 @@ def load_cards():
     index is missing/stale/corrupt/unbuildable or --no-db was passed. The
     fallback never regresses behaviour; it is just slower.
     """
+    check_cache_age()
     if state.DB_MODE and state.DB is not None:
         return
     if state.CARDS:

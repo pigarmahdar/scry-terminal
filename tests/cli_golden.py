@@ -63,6 +63,7 @@ def run_all():
     out = {}
     for label, args, env_over in CASES:
         env = dict(os.environ)
+        env["SCRYFALL_NO_CACHE_WARN"] = "1"
         env.update(env_over)
         p = subprocess.run([CLI] + args, capture_output=True, text=True, env=env, cwd=REPO)
         out[label] = {"rc": p.returncode, "out": p.stdout, "err": p.stderr}

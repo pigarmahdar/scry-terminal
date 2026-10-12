@@ -11,7 +11,7 @@ mutate its attributes so every module sees one object.
 """
 from .project import slim_card, text_card, emit_records, emit_single  # noqa: F401
 from .state import machine_mode, resolve_format, warn, c, fmt  # noqa: F401
-from .store import load_cards, open_db, db_status, build_db  # noqa: F401
+from .store import load_cards, open_db, db_status, build_db, check_cache_age  # noqa: F401
 from .search import (  # noqa: F401
     search_name, search_text, search_type, search_color, search_cmc,
     search_keyword, search_general, search_random, search_oracle,

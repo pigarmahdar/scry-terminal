@@ -383,6 +383,7 @@ def _handle_oracle(query, options):
 
     if not records:
         print("\n  No cards found matching your search.")
+        print(f"  Try 'scryfall fuzzy \"{query}\"' for typo tolerance.\n")
         return
     if total > shown:
         print(f"\n  Showing {shown} of {total} results (use --limit {total} to see all):")
