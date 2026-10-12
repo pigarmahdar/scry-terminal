@@ -17,7 +17,7 @@ from .store import _hydrate, _fts_phrase
 
 # ── Scryfall API calls for fuzzy matching ─────────────────────────────
 SCRYFALL_API = "https://api.scryfall.com"
-USER_AGENT = "scryfall-cli/1.0"
+USER_AGENT = "scry-terminal/1.0"
 
 def _api_get(endpoint, params=None):
     """Make a GET request to the Scryfall API. Returns parsed JSON or None."""

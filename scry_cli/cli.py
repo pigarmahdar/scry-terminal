@@ -1,12 +1,12 @@
 # Argument parsing, command routing, maintenance handlers, main().
 # This is the only module that may call sys.exit() for user-facing errors (the
 # library modules above it raise/return instead), and the only one that reads
-# sys.argv. The usage docstring below is printed verbatim by `scryfall` with no
+# sys.argv. The usage docstring below is printed verbatim by `scry` with no
 # args, exactly as the single-file script did.
 """
-scryfall — Local MTG card search from your Oracle cache.
+scry (Scry Terminal) — Local MTG card search from your Oracle cache.
 Usage:
-  scryfall <command> <query> [options]
+  scry <command> <query> [options]
 
 Commands:
   name <query>        Search by card name (partial match)
@@ -21,6 +21,7 @@ Commands:
   search <query>      General search across name + text + type
   price <query>       Search by name, showing market prices
   image <name>        Download PNG image of a card (to Desktop by default)
+  deck <file>         Analyze a decklist (mana curve, colors, engines, format audit)
   update              Update the Oracle cache from Scryfall
 
 Options:
@@ -34,7 +35,7 @@ Options:
   --border <black|silver>  Request a specific border colour for 'image'
   --format <fmt>      Output format: pretty | json | jsonl | csv | tsv
                       Default is auto-detected: pretty on a terminal, jsonl when
-                      piped or redirected. Env override: SCRYFALL_FORMAT=<fmt>.
+                      piped or redirected. Env override: SCRY_FORMAT=<fmt>.
                       NO_COLOR=1 strips ANSI styling from pretty output.
 
 Machine-readable output (json/jsonl/csv/tsv):
@@ -47,25 +48,26 @@ Machine-readable output (json/jsonl/csv/tsv):
   of prompting. Pass --pretty to force human output even when piped.
 
 Examples:
-  scryfall name "Gilded Drake"
-  scryfall text "create a treasure token"
-  scryfall type "enchantment"
-  scryfall color WG
-  scryfall cmc <=3
-  scryfall keyword flying
-  scryfall random
-  scryfall search "2 mana green creature"
-  scryfall name "Sol Ring" --legal commander --limit 5
-  scryfall oracle "Sol Ring"
-  scryfall oracle "Elemental" --limit 999
-  scryfall fuzzy "sol rng"
-  scryfall fuzzy "jac bele"
-  scryfall price "Sol Ring"
-  scryfall price "treasure" --sort price
-  scryfall image "Sol Ring"
-  scryfall image "sol rng" --size large
-  scryfall search "counter target spell" --json | jq '.[].name'
-  SCRYFALL_FORMAT=json scryfall price "Force of Will"   # for agents/harnesses
+  scry name "Gilded Drake"
+  scry text "create a treasure token"
+  scry type "enchantment"
+  scry color WG
+  scry cmc <=3
+  scry keyword flying
+  scry random
+  scry search "2 mana green creature"
+  scry name "Sol Ring" --legal commander --limit 5
+  scry oracle "Sol Ring"
+  scry oracle "Elemental" --limit 999
+  scry fuzzy "sol rng"
+  scry fuzzy "jac bele"
+  scry price "Sol Ring"
+  scry price "treasure" --sort price
+  scry image "Sol Ring"
+  scry image "sol rng" --size large
+  scry deck my_deck.txt
+  scry search "counter target spell" --json | jq '.[].name'
+  SCRY_FORMAT=json scry price "Force of Will"   # for agents/harnesses
 """
 
 import json
@@ -188,7 +190,7 @@ def handle_update():
     try:
         req = urllib.request.Request(
             "https://api.scryfall.com/bulk-data",
-            headers={"User-Agent": "scryfall-cli/1.0", "Accept": "application/json"},
+            headers={"User-Agent": "scry-terminal/1.0", "Accept": "application/json"},
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
             bulk_data = json.loads(resp.read().decode("utf-8"))
@@ -211,7 +213,7 @@ def handle_update():
     try:
         req = urllib.request.Request(
             download_url,
-            headers={"User-Agent": "scryfall-cli/1.0"},
+            headers={"User-Agent": "scry-terminal/1.0"},
         )
         with urllib.request.urlopen(req, timeout=300) as resp:
             with open(gz_path, "wb") as f:
@@ -296,7 +298,7 @@ def handle_deck(query, options):
             emit_single({"error": "empty_decklist", "message": "No decklist file or input provided."})
         else:
             print('\n  ' + c('✗ No decklist file or input provided.', '1;31'))
-            print("  Usage: scryfall deck <file> | cat deck.txt | scryfall deck\n")
+            print("  Usage: scry deck <file> | cat deck.txt | scry deck\n")
         sys.exit(1)
 
     target_format = options.get("legal") or "commander"
@@ -319,7 +321,7 @@ def handle_reindex():
     """Rebuild the SQLite sidecar from the JSONL cache."""
     import time
     if not os.path.exists(ORACLE_PATH):
-        warn("Oracle cache not found at %s — run 'scryfall update' first." % ORACLE_PATH)
+        warn("Oracle cache not found at %s — run 'scry update' first." % ORACLE_PATH)
         sys.exit(1)
     sq = _sqlite_module()
     if sq is None or not _sqlite_supports_fts5(sq):
@@ -372,7 +374,7 @@ def handle_doctor():
             lines.append(("index read", "FAILED: %s" % e))
     else:
         lines.append(("index", "not built yet (runs automatically on next query,"
-                               " or 'scryfall reindex')"))
+                               " or 'scry reindex')"))
 
     use_db = bool(sq and fts_ok and not stale and os.path.exists(DB_PATH))
     lines.append(("queries would use", "SQLite index" if use_db else "JSONL full scan"))
@@ -424,7 +426,7 @@ def _handle_oracle(query, options):
 
     if not records:
         print("\n  No cards found matching your search.")
-        print(f"  Try 'scryfall fuzzy \"{query}\"' for typo tolerance.\n")
+        print(f"  Try 'scry fuzzy \"{query}\"' for typo tolerance.\n")
         return
     if total > shown:
         print(f"\n  Showing {shown} of {total} results (use --limit {total} to see all):")
@@ -485,7 +487,7 @@ def main():
         else:
             print("\n  " + c(fmt("✗ Unknown command '{}'.", command), '1;31'))
             print(f"  Valid commands: {', '.join(sorted(VALID_COMMANDS - {'update', 'mcp'}))}")
-            print(f"  Use 'scryfall search \"{command} {query}\"' for a general search.\n")
+            print(f"  Use 'scry search \"{command} {query}\"' for a general search.\n")
         sys.exit(1)
 
     # Guard empty queries (#1) — except random which needs no query
@@ -494,7 +496,7 @@ def main():
             emit_single({"error": "empty_query", "command": command})
         else:
             print('\n  ' + c('✗ No search query provided.', '1;31'))
-            print(f"  Usage: scryfall {command} <query>\n")
+            print(f"  Usage: scry {command} <query>\n")
         sys.exit(1)
 
     # Load cards
@@ -519,7 +521,7 @@ def main():
                 emit_single({"error": "invalid_color", "query": query, "details": str(e)})
             else:
                 print("\n  " + c(fmt("✗ Invalid colour: {}", e), '1;31'))
-                print("  Usage: scryfall color W | scryfall color WG | scryfall color BGR\n")
+                print("  Usage: scry color W | scry color WG | scry color BGR\n")
             sys.exit(1)
     elif command == "cmc":
         try:
@@ -529,7 +531,7 @@ def main():
                 emit_single({"error": "invalid_cmc", "query": query, "details": str(e)})
             else:
                 print("\n  " + c(fmt("✗ Invalid mana value: {}", e), '1;31'))
-                print("  Usage: scryfall cmc 3 | scryfall cmc <=3 | scryfall cmc >=3\n")
+                print("  Usage: scry cmc 3 | scry cmc <=3 | scry cmc >=3\n")
             sys.exit(1)
     elif command == "keyword":
         results = search_keyword(query)

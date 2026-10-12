@@ -1,4 +1,4 @@
-# AGENT.md — Instructions for AI agents using `scryfall`
+# AGENT.md — Instructions for AI agents using `scry` (Scry Terminal)
 
 > This document is written for LLM agents, coding harnesses, and tool-calling
 > models. An operator can paste it into a system prompt or reference this file
@@ -6,7 +6,7 @@
 
 ## What this tool is
 
-`scryfall` is a local command-line tool that searches a full Magic: The Gathering
+`scry` (Scry Terminal) is a local command-line tool that searches a full Magic: The Gathering
 card database (Scryfall Oracle data, ~38,000 cards) from a cached file on disk.
 It is free, has no API keys, no rate limits, and works offline. Card images and
 fuzzy name resolution require internet; all searching does not.
@@ -28,7 +28,7 @@ Stream rules:
 
 - **stdout contains ONLY data.** Parse it as JSON; never expect prose there.
 - **stderr carries warnings** (e.g. truncation notices). They are informational,
-  prefixed `scryfall: `. Read them, act on them, do not parse them as data.
+  prefixed `scry: `. Read them, act on them, do not parse them as data.
 - Exit code `0` = success. Non-zero = failure; stdout holds an error object like
   `{"error": "unknown_command", ...}` or `{"error": "empty_query", ...}`.
 
@@ -46,7 +46,7 @@ returns a deliberate subset — see its section below):
 | `cmc` | number | Converted mana cost; usually integer, can be fractional (e.g. `0.5`) |
 | `type_line` | string | e.g. `"Creature — Drake"` |
 | `colors` | array | Printed colours of the card (may differ from `color_identity`) |
-| `color_identity` | array | Colour identity letters W/U/B/R/G — what counts for deck legality. Added in the SQLite-index release; older cached output lacked this field. |
+| `color_identity` | array | Colour identity letters W/U/B/R/G — what counts for deck legality. |
 | `power`, `toughness` | string\|null | Creatures only; STRINGS not numbers (`"3"`, `".5"`, `"*"`); null for non-creatures |
 | `oracle_text` | string | Canonical rules text; may contain `\n` |
 | `keywords` | array | e.g. `["Flying", "Menace"]` |
@@ -60,26 +60,26 @@ and oracle text.
 
 ## Commands
 
-Run `scryfall <command> "<query>" [flags]` via your shell/bash tool.
+Run `scry <command> "<query>" [flags]` via your shell/bash tool (`scryfall` also works as an alias).
 
 | Command | Use when | Example |
 |---|---|---|
-| `fuzzy "<name>"` | You have a card name, possibly misspelled or partial. START HERE for named-card questions. | `scryfall fuzzy "sol rng"` |
-| `oracle "<name>"` | You know the exact name and want ONLY what the card does. Cheapest answer for "what does this card do?" | `scryfall oracle "Sol Ring"` |
-| `name "<text>"` | Substring match on card names | `scryfall name "drake"` |
-| `text "<effect>"` | Find cards that DO something | `scryfall text "counter target spell"` |
-| `type "<type>"` | Find cards that ARE something | `scryfall type "enchantment"` |
-| `color "<WUBRG>"` | Cards whose identity includes these colours | `scryfall color WG` |
-| `cmc "<expr>"` | Mana value: exact `3`, `<=3`, `>=3` | `scryfall cmc <=2` |
-| `keyword "<kw>"` | Keyword abilities | `scryfall keyword menace` |
-| `search "<words>"` | Loose query across name+text+type | `scryfall search "2 mana green creature"` |
-| `price "<name>"` | Market prices, most expensive first | `scryfall price "Force of Will"` |
-| `random` | A random card | `scryfall random` |
-| `image "<name>"` | Download card image PNG/JPG to disk | `scryfall image "Sol Ring" --out /tmp/cards` |
-| `deck "<file>"` | Static analysis & diagnostic audit across 4 pillars (mana, dynamic, engine, heritage) | `scryfall deck deck.txt` |
-| `mcp` | Launch Model Context Protocol server on stdio for native agent tool calling | `scryfall mcp` |
-| `reindex` | Rebuild the local search index (rarely needed; see below) | `scryfall reindex` |
-| `doctor` | Report index health/staleness | `scryfall doctor` |
+| `fuzzy "<name>"` | You have a card name, possibly misspelled or partial. START HERE for named-card questions. | `scry fuzzy "sol rng"` |
+| `oracle "<name>"` | You know the exact name and want ONLY what the card does. Cheapest answer for "what does this card do?" | `scry oracle "Sol Ring"` |
+| `name "<text>"` | Substring match on card names | `scry name "drake"` |
+| `text "<effect>"` | Find cards that DO something | `scry text "counter target spell"` |
+| `type "<type>"` | Find cards that ARE something | `scry type "enchantment"` |
+| `color "<WUBRG>"` | Cards whose identity includes these colours | `scry color WG` |
+| `cmc "<expr>"` | Mana value: exact `3`, `<=3`, `>=3` | `scry cmc <=2` |
+| `keyword "<kw>"` | Keyword abilities | `scry keyword menace` |
+| `search "<words>"` | Loose query across name+text+type | `scry search "2 mana green creature"` |
+| `price "<name>"` | Market prices, most expensive first | `scry price "Force of Will"` |
+| `random` | A random card | `scry random` |
+| `image "<name>"` | Download card image PNG/JPG to disk | `scry image "Sol Ring" --out /tmp/cards` |
+| `deck "<file>"` | Static analysis & diagnostic audit across 4 pillars (mana, dynamic, engine, heritage) | `scry deck deck.txt` |
+| `mcp` | Launch Model Context Protocol server on stdio for native agent tool calling | `scry mcp` |
+| `reindex` | Rebuild the local search index (rarely needed; see below) | `scry reindex` |
+| `doctor` | Report index health/staleness | `scry doctor` |
 
 Useful flags: `--limit N` (default 10), `--legal commander|modern|legacy|pauper|vintage`,
 `--commander WUBRG` (identity fits within these colours), `--exact`, `--commander-card <name>`.
@@ -105,7 +105,7 @@ wrong command — use `fuzzy`, `name`, or `price`. Do not infer legality or pric
 from an `oracle` record; the fields are absent by design, not unknown to you.
 
 Matching order: exact name (grouped by canonical text, so same-name cards with
-genuinely different text stay separate records), then substring fallback. An empty
+geninitely different text stay separate records), then substring fallback. An empty
 result means no card of that name is cached — for a possible misspelling, retry
 with `fuzzy` rather than concluding the card does not exist. Never fabricate the
 missing text.
@@ -130,6 +130,8 @@ empty, tell the user no card was found — do NOT guess a different card.
 
 If `saved` is non-null the file exists on disk at that path — you may open/read
 it as an image. If `error` is `"not_found"` or `"no_image"`, report it; do not
+hallucinate a download.
+
 `deck` returns ONE comprehensive diagnostic object:
 
 ```json
@@ -169,20 +171,20 @@ All other commands emit JSONL: zero or more card records, one per line.
 ## Truncation
 
 Default limit is 10. When more matches exist, stderr says
-`scryfall: 10 of 436 matches shown (use --limit 436 for all)` while stdout still
+`scry: 10 of 436 matches shown (use --limit 436 for all)` while stdout still
 holds only the 10 records. If you need complete results, re-run with a larger
 `--limit`. Prefer post-filtering with `jq` over dumping hundreds of records into
 context:
 
 ```shell
-scryfall search "counter target spell" --limit 500 2>/dev/null | jq -r 'select(.legalities.modern=="legal") | .name'
+scry search "counter target spell" --limit 500 2>/dev/null | jq -r 'select(.legalities.modern=="legal") | .name'
 ```
 
 ## Latency and the search index
 
 Queries are served from a SQLite index derived from the Oracle cache
 (`~/.hermes/scryfall/oracle-cards.db`, ~102 MB, rebuilt automatically on demand or
-by `scryfall update`). A typical lookup costs **43–58 ms**; broad queries
+by `scry update`). A typical lookup costs **43–58 ms**; broad queries
 (`type creature`, `cmc <=3`) cost ~220 ms because they materialise thousands of
 rows, not because of the lookup. Peak memory is 22–39 MB per call for typical
 queries.
@@ -199,7 +201,7 @@ Practical consequences for you:
   never committed to git.
 
 If you suspect the index is lying to you (unexpected empty results), run
-`scryfall doctor` and compare against `scryfall <same query> --no-db`, which
+`scry doctor` and compare against `scry <same query> --no-db`, which
 forces the legacy full-scan path. Report a divergence as a bug; do not silently
 work around it.
 
@@ -211,9 +213,9 @@ work around it.
    candidates, the card likely does not exist — say so.
 3. Do not pipe through `head`/`tail` before parsing; JSONL is already bounded by
    `--limit`. Use `2>/dev/null` to silence stderr noise when you don't need warnings.
-4. Quote queries: `scryfall name "Bosh, Iron Golem"` — unquoted multi-word
+4. Quote queries: `scry name "Bosh, Iron Golem"` — unquoted multi-word
    queries split into separate arguments and silently search the wrong string.
-5. Prices are cache-stale (see `scryfall update` cadence, typically ≤ weekly).
+5. Prices are cache-stale (see `scry update` cadence, typically ≤ weekly).
    Present them as approximate.
 6. One tool call per distinct question; batch related lookups with `&&` chains
    rather than guessing between calls.

@@ -1,12 +1,11 @@
-"""scryfall_cli — package form of the `scryfall` CLI.
+"""scry_cli — package form of Scry Terminal (`scry`).
 
 Deliberately side-effect-free: importing this package must never open the
-index, touch argv, or print. Entry point is `scryfall_cli.cli.main()`.
+index, touch argv, or print. Entry point is `scry_cli.cli.main()`.
 
 The names re-exported here are exactly the surface the parity harness and any
-other in-process consumer needs — they used to be trivially reachable because
-the whole tool was one module. Mutable state (DB / DB_MODE / CARDS / MODE /
-USE_COLOR / FORCE_NO_DB) is NOT re-exported: import `scryfall_cli.state` and
+other in-process consumer needs. Mutable state (DB / DB_MODE / CARDS / MODE /
+USE_COLOR / FORCE_NO_DB) is NOT re-exported: import `scry_cli.state` and
 mutate its attributes so every module sees one object.
 """
 from .project import slim_card, text_card, emit_records, emit_single  # noqa: F401

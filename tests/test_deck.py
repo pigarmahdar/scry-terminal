@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Comprehensive unit tests for scryfall_cli/deck.py."""
+"""Comprehensive unit tests for scry_cli/deck.py."""
 import unittest
 
-from scryfall_cli import deck, state
+from scry_cli import deck, state
 
 
 class TestDeckParser(unittest.TestCase):

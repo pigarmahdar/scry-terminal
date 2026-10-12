@@ -28,7 +28,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-CLI = os.path.join(REPO, "scryfall")
+CLI = os.path.join(REPO, "scry")
 BASELINE = os.path.join(HERE, "golden.json")
 
 # (label, argv, env overrides) — env is merged over the caller's environment.

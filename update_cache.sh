@@ -55,9 +55,12 @@ echo "   Cards: $LINE_COUNT"
 #    Safe to skip: the tool detects a stale index by mtime/size and rebuilds
 #    or falls back on its own — this just avoids a slow first query later.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -x "$SCRIPT_DIR/scryfall" ]; then
+if [ -x "$SCRIPT_DIR/scry" ]; then
+    echo "Rebuilding search index..."
+    "$SCRIPT_DIR/scry" reindex || echo "WARN: index rebuild failed; queries will use the full scan"
+elif [ -x "$SCRIPT_DIR/scryfall" ]; then
     echo "Rebuilding search index..."
     "$SCRIPT_DIR/scryfall" reindex || echo "WARN: index rebuild failed; queries will use the full scan"
 else
-    echo "NOTE: run 'scryfall reindex' to refresh the search index (optional)."
+    echo "NOTE: run 'scry reindex' to refresh the search index (optional)."
 fi

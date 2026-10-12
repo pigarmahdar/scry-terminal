@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""scry — Scry Terminal executable shim.
+
+The implementation lives in the scry_cli/ package next to this file (see
+README "Project layout"). This shim keeps the install story simple — `chmod +x
+scry` still works, and `update_cache.sh` calling `./scry reindex` still
+works.
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from scry_cli.cli import main  # noqa: E402
+
+if __name__ == "__main__":
+    main()

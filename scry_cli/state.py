@@ -10,8 +10,16 @@ import os
 import sys
 
 # ── Path to the Oracle cards cache ──────────────────────────────────────
-ORACLE_PATH = os.environ.get("SCRYFALL_ORACLE_PATH") or os.path.expanduser("~/.hermes/scryfall/oracle-cards.jsonl")
-DB_PATH = os.environ.get("SCRYFALL_DB_PATH") or os.path.expanduser("~/.hermes/scryfall/oracle-cards.db")
+ORACLE_PATH = (
+    os.environ.get("SCRY_ORACLE_PATH")
+    or os.environ.get("SCRYFALL_ORACLE_PATH")
+    or os.path.expanduser("~/.hermes/scryfall/oracle-cards.jsonl")
+)
+DB_PATH = (
+    os.environ.get("SCRY_DB_PATH")
+    or os.environ.get("SCRYFALL_DB_PATH")
+    or os.path.expanduser("~/.hermes/scryfall/oracle-cards.db")
+)
 SCHEMA_VERSION = "1"
 
 # ── Output mode (resolved once at startup in main()) ────────────────────
@@ -23,7 +31,7 @@ def machine_mode():
 
 def resolve_format(explicit):
     """Decide output format. Priority: --format/--json/--pretty flag >
-    $SCRYFALL_FORMAT env var > terminal auto-detection.
+    $SCRY_FORMAT / $SCRYFALL_FORMAT env var > terminal auto-detection.
 
     Auto-detection is the human-vs-agent signal: a human typing in a terminal
     has a TTY on stdout and gets styled text; an LLM harness or script that
@@ -38,7 +46,7 @@ def resolve_format(explicit):
                          "valid_formats": sorted(VALID_FORMATS)})
             sys.exit(1)
         return explicit
-    env = os.environ.get("SCRYFALL_FORMAT", "").strip().lower()
+    env = (os.environ.get("SCRY_FORMAT") or os.environ.get("SCRYFALL_FORMAT", "")).strip().lower()
     if env in VALID_FORMATS:
         return env
     try:
@@ -71,7 +79,7 @@ def fmt(template, *args, **kw):
 
 def warn(msg):
     """Status/warning line → stderr so stdout stays pure data in machine modes."""
-    print(f"scryfall: {msg}", file=sys.stderr)
+    print(f"scry: {msg}", file=sys.stderr)
 
 # ── Shared query/data state (moved verbatim; one module = one source of truth)
 # DB is an open sqlite3.Connection once load_cards() has run; DB_MODE flips when

@@ -28,8 +28,8 @@ REPO = os.path.dirname(HERE)
 # (Stage 1's parity harness had to load the single-file script by path because
 #  it wasn't importable; the package split removed that friction.)
 sys.path.insert(0, REPO)
-import scryfall_cli as cli            # noqa: E402
-from scryfall_cli import state        # noqa: E402  (shared mutable state)
+import scry_cli as cli            # noqa: E402
+from scry_cli import state        # noqa: E402  (shared mutable state)
 
 
 def load_both():
@@ -259,7 +259,7 @@ def main():
 
     # _resolve_card offline behaviour (exact/partial/typo candidate pools).
     # Network step is neutralised so this stays hermetic and fast.
-    from scryfall_cli import api as _api
+    from scry_cli import api as _api
     orig_api = _api.scryfall_fuzzy
     _api.scryfall_fuzzy = lambda name: None
     try:

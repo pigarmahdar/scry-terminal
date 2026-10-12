@@ -12,7 +12,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 
-from scryfall_cli import mcp
+from scry_cli import mcp
 
 
 class TestMCPServer(unittest.TestCase):
@@ -270,7 +270,7 @@ class TestMCPServer(unittest.TestCase):
 
 
     def test_tool_call_deck(self):
-        from scryfall_cli import state
+        from scry_cli import state
         old_cards = state.CARDS
         old_db_mode = state.DB_MODE
         old_force = state.FORCE_NO_DB
