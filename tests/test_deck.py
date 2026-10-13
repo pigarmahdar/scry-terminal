@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Comprehensive unit tests for scry_cli/deck.py."""
 import unittest
+from unittest import mock
 
 from scry_cli import deck, state
 
@@ -253,6 +254,101 @@ class TestDeckResolutionFallback(unittest.TestCase):
         self.assertEqual(len(unresolved), 0)
         self.assertEqual(resolved[0]["card"]["name"], "Delver of Secrets // Insectile Aberration")
 
+    def test_alias_resolution_master_emerald_shrine(self):
+        state.CARDS = [
+            {
+                "name": "Command Tower",
+                "mana_cost": "",
+                "cmc": 0.0,
+                "type_line": "Land",
+                "colors": [],
+                "color_identity": [],
+                "oracle_text": "{T}: Add one mana of any color in your commander's color identity.",
+                "legalities": {"commander": "legal"},
+                "prices": {"usd": "0.25"},
+            }
+        ]
+        state.DB_MODE = False
+
+        entries = [{"count": 1, "name": "Master Emerald Shrine", "section": "main"}]
+        resolved, unresolved = deck.resolve_deck_cards(entries)
+        self.assertEqual(len(unresolved), 0)
+        self.assertEqual(len(resolved), 1)
+        self.assertEqual(resolved[0]["card"]["name"], "Command Tower")
+        self.assertEqual(resolved[0]["original_alias"], "Master Emerald Shrine")
+
+    def test_clean_card_name_dual_alias(self):
+        # Dual-name syntax like "Master Emerald Shrine (Command Tower)"
+        cleaned = deck.clean_card_name("Master Emerald Shrine (Command Tower)")
+        self.assertIn(cleaned, ("Master Emerald Shrine", "Command Tower"))
+
+    def test_run_deck_analysis_reports_resolved_aliases(self):
+        state.CARDS = [
+            {
+                "name": "Command Tower",
+                "mana_cost": "",
+                "cmc": 0.0,
+                "type_line": "Land",
+                "colors": [],
+                "color_identity": [],
+                "oracle_text": "{T}: Add one mana of any color.",
+                "legalities": {"commander": "legal"},
+                "prices": {"usd": "0.25"},
+            },
+            {
+                "name": "Baral, Chief of Compliance",
+                "mana_cost": "{1}{U}",
+                "cmc": 2.0,
+                "type_line": "Legendary Creature — Human Wizard",
+                "colors": ["U"],
+                "color_identity": ["U"],
+                "oracle_text": "Spells cost {1} less.",
+                "legalities": {"commander": "legal"},
+                "prices": {"usd": "2.00"},
+            }
+        ]
+        state.DB_MODE = False
+
+        deck_txt = """
+        // Commander
+        1 Baral, Chief of Compliance
+
+        // Mainboard
+        1 Master Emerald Shrine
+        """
+        res = deck.run_deck_analysis(deck_txt, deck_name="Test Deck", target_format="commander")
+        self.assertEqual(len(res["unresolved_cards"]), 0)
+        self.assertEqual(len(res["resolved_aliases"]), 1)
+        self.assertEqual(res["resolved_aliases"][0]["alias"], "Master Emerald Shrine")
+        self.assertEqual(res["resolved_aliases"][0]["canonical"], "Command Tower")
+
+    @mock.patch("scry_cli.api.scryfall_fuzzy")
+    def test_online_fallback_resolution(self, mock_fuzzy):
+        mock_fuzzy.return_value = {
+            "name": "Sword of Truth and Justice",
+            "flavor_name": "Tidus's Ancient Relic",
+            "mana_cost": "{3}",
+            "cmc": 3.0,
+            "type_line": "Artifact — Equipment",
+            "colors": [],
+            "color_identity": [],
+            "oracle_text": "Equipped creature gets +2/+2.",
+            "legalities": {"commander": "legal"},
+            "prices": {"usd": "12.00"},
+        }
+        state.CARDS = []
+        state.DB_MODE = False
+
+        entries = [{"count": 1, "name": "Tidus's Ancient Relic", "section": "main"}]
+        with mock.patch("scry_cli.aliases.save_user_alias") as mock_save:
+            resolved, unresolved = deck.resolve_deck_cards(entries, offline=False)
+            self.assertEqual(len(unresolved), 0)
+            self.assertEqual(len(resolved), 1)
+            self.assertEqual(resolved[0]["card"]["name"], "Sword of Truth and Justice")
+            self.assertTrue(resolved[0].get("discovered_online"))
+            mock_save.assert_called_once_with("tidus's ancient relic", "Sword of Truth and Justice")
+
 
 if __name__ == "__main__":
     unittest.main()
+

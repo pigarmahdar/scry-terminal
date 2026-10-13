@@ -158,6 +158,9 @@ def parse_args(args):
             # Escape hatch: force the legacy JSONL scan path (debugging/parity).
             state.FORCE_NO_DB = True  # module attr: parse_args can't `global` across modules
             i += 1
+        elif arg == "--offline":
+            options["offline"] = True
+            i += 1
         elif arg.startswith("--"):
             # Unknown flag: emit structured error (stdout is still pure data)
             emit_single({"error": "unknown_flag", "flag": arg})
@@ -303,9 +306,10 @@ def handle_deck(query, options):
 
     target_format = options.get("legal") or "commander"
     commander_override = options.get("commander_card")
+    offline = options.get("offline", False)
     from .deck import run_deck_analysis
     res = run_deck_analysis(deck_content, deck_name=deck_name, target_format=target_format,
-                            commander_override=commander_override)
+                            commander_override=commander_override, offline=offline)
 
     if machine_mode():
         json.dump(res, sys.stdout, indent=2, ensure_ascii=False)

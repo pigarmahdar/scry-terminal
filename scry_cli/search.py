@@ -56,6 +56,14 @@ def search_oracle(query, limit=None):
             "SELECT min(rid) AS rid, count(*) AS n FROM cards"
             " WHERE name_lc = ? GROUP BY %s ORDER BY min(rid)" % _ORACLE_SIG,
             (q,)).fetchall()
+        if not rows:
+            from . import aliases
+            canon = aliases.resolve_alias(q)
+            if canon:
+                rows = state.DB.execute(
+                    "SELECT min(rid) AS rid, count(*) AS n FROM cards"
+                    " WHERE name_lc = ? GROUP BY %s ORDER BY min(rid)" % _ORACLE_SIG,
+                    (canon.lower(),)).fetchall()
         if rows:
             ids = [r[0] for r in (rows[:limit] if limit else rows)]
             hydrated = {h[0]: json.loads(h[1]) for h in state.DB.execute(
@@ -90,6 +98,17 @@ def search_oracle(query, limit=None):
             exact[key][2] += 1
         elif q in name:
             subs.append((i, card))
+    if not exact:
+        from . import aliases
+        canon = aliases.resolve_alias(q)
+        if canon:
+            canon_lc = canon.lower()
+            for i, card in enumerate(state.CARDS):
+                if str(card.get("name") or "").lower() == canon_lc:
+                    key = _oracle_signature(card)
+                    if key not in exact:
+                        exact[key] = [i, card, 0]
+                    exact[key][2] += 1
     if exact:
         ordered = sorted(exact.values(), key=lambda v: v[0])
         taken = ordered[:limit] if limit else ordered
@@ -110,6 +129,12 @@ def search_name(query, exact=False):
         if exact:
             rows = state.DB.execute("SELECT data FROM cards WHERE name_lc = ? ORDER BY rid",
                               (query_lower,)).fetchall()
+            if not rows:
+                from . import aliases
+                canon = aliases.resolve_alias(query_lower)
+                if canon:
+                    rows = state.DB.execute("SELECT data FROM cards WHERE name_lc = ? ORDER BY rid",
+                                            (canon.lower(),)).fetchall()
         else:
             rows = _substr_rows("name", query_lower)
         return _hydrate(rows)
@@ -122,6 +147,13 @@ def search_name(query, exact=False):
         else:
             if query_lower in name:
                 results.append(card)
+    if exact and not results:
+        from . import aliases
+        canon = aliases.resolve_alias(query_lower)
+        if canon:
+            for card in state.CARDS:
+                if card.get("name", "").lower() == canon.lower():
+                    results.append(card)
     return results
 
 def search_text(query):
@@ -242,7 +274,13 @@ def search_general(query):
     """Search across name, oracle text, and type line."""
     query_lower = query.lower()
     if state.DB_MODE:
-        return _hydrate(_any_substr_rows(query_lower))
+        res = _hydrate(_any_substr_rows(query_lower))
+        if not res:
+            from . import aliases
+            canon = aliases.resolve_alias(query)
+            if canon:
+                return _hydrate(_any_substr_rows(canon.lower()))
+        return res
     results = []
     seen = set()
     for card in state.CARDS:
@@ -255,6 +293,21 @@ def search_general(query):
         if query_lower in name or query_lower in oracle or query_lower in type_line:
             results.append(card)
             seen.add(card_id)
+    if not results:
+        from . import aliases
+        canon = aliases.resolve_alias(query)
+        if canon:
+            canon_lower = canon.lower()
+            for card in state.CARDS:
+                card_id = card.get("id", "")
+                if card_id in seen:
+                    continue
+                name = card.get("name", "").lower()
+                oracle = card.get("oracle_text", "").lower()
+                type_line = card.get("type_line", "").lower()
+                if canon_lower in name or canon_lower in oracle or canon_lower in type_line:
+                    results.append(card)
+                    seen.add(card_id)
     return results
 
 def search_random():

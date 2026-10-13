@@ -55,6 +55,15 @@ def clean_card_name(raw_name: str) -> str:
         parts = [p.strip() for p in name.split("/") if p.strip()]
         if len(parts) == 2:
             name = f"{parts[0]} // {parts[1]}"
+    # Handle dual-name format like "Master Emerald Shrine (Command Tower)"
+    m_paren = re.match(r"^(.+?)\s*\((.+?)\)$", name)
+    if m_paren:
+        p1, p2 = m_paren.group(1).strip(), m_paren.group(2).strip()
+        from . import aliases
+        if aliases.resolve_alias(p1):
+            name = p1
+        elif aliases.resolve_alias(p2):
+            name = p2
     return name.strip()
 
 
@@ -121,65 +130,82 @@ def parse_decklist(text_or_lines: str | List[str]) -> List[Dict[str, Any]]:
 
 def resolve_deck_cards(
     parsed_entries: List[Dict[str, Any]],
+    offline: bool = False,
 ) -> Tuple[List[Dict[str, Any]], List[str]]:
-    """Resolve card names to card data strictly offline.
+    """Resolve card names to card data strictly offline with optional online fallback."""
+    from . import aliases
 
-    Returns (resolved_items, unresolved_names) where resolved_items is a list of:
-        {"entry": parsed_entry, "card": card_dict}
-    """
     distinct_names = list({e["name"].lower() for e in parsed_entries})
     name_map: Dict[str, Dict[str, Any]] = {}
+    alias_targets: Dict[str, str] = {}  # original_nlc -> canonical_target_nlc
+
+    # Check aliases for distinct names
+    lookup_names_set: Set[str] = set()
+    for n in distinct_names:
+        canon = aliases.resolve_alias(n)
+        if canon:
+            canon_lc = canon.lower()
+            alias_targets[n] = canon_lc
+            lookup_names_set.add(canon_lc)
+        else:
+            lookup_names_set.add(n)
+
+    lookup_names = list(lookup_names_set)
+    raw_found: Dict[str, Dict[str, Any]] = {}
 
     # 1. Primary Batch Lookup
     if state.DB_MODE and state.DB is not None:
-        # SQLite batch lookup: SELECT name_lc, data FROM cards WHERE name_lc IN (...)
-        # Chunk into groups of 200 to stay well under SQLite parameter limits
         chunk_size = 200
-        for i in range(0, len(distinct_names), chunk_size):
-            chunk = distinct_names[i : i + chunk_size]
+        for i in range(0, len(lookup_names), chunk_size):
+            chunk = lookup_names[i : i + chunk_size]
             placeholders = ",".join("?" for _ in chunk)
             sql = f"SELECT name_lc, data FROM cards WHERE name_lc IN ({placeholders})"
             rows = state.DB.execute(sql, chunk).fetchall()
             for name_lc, data_json in rows:
-                if name_lc not in name_map:
+                if name_lc not in raw_found:
                     try:
-                        name_map[name_lc] = json.loads(data_json)
+                        raw_found[name_lc] = json.loads(data_json)
                     except Exception:
                         pass
     elif state.CARDS:
-        # Legacy CARDS memory scan
         cards_by_name = {c.get("name", "").lower(): slim_card(c) for c in state.CARDS}
-        for n in distinct_names:
+        for n in lookup_names:
             if n in cards_by_name:
-                name_map[n] = cards_by_name[n]
+                raw_found[n] = cards_by_name[n]
+
+    # Map back to distinct_names
+    for n in distinct_names:
+        target = alias_targets.get(n, n)
+        if target in raw_found:
+            name_map[n] = raw_found[target]
 
     # 2. Offline Fallback for Unmatched Cards (Split cards, front-face, typos)
     unmatched = [n for n in distinct_names if n not in name_map]
     if unmatched:
         if state.DB_MODE and state.DB is not None:
             for un in unmatched:
+                target_un = alias_targets.get(un, un)
                 # Try front-face match: e.g. "Delver of Secrets" for "Delver of Secrets // Insectile Aberration"
                 row = state.DB.execute(
                     "SELECT data FROM cards WHERE name_lc LIKE ? || ' // %' LIMIT 1",
-                    (un,),
+                    (target_un,),
                 ).fetchone()
                 if row:
                     name_map[un] = json.loads(row[0])
                     continue
 
                 # Try substring LIKE search if query is at least 4 chars
-                if len(un) >= 4:
-                    pattern = f"%{un}%"
+                if len(target_un) >= 4:
+                    pattern = f"%{target_un}%"
                     candidates = state.DB.execute(
                         "SELECT name, data FROM cards WHERE name_lc LIKE ? LIMIT 5",
                         (pattern,),
                     ).fetchall()
                     if candidates:
-                        # Pick best match using difflib
                         best_match = None
                         best_score = 0.0
                         for cand_name, cand_data in candidates:
-                            score = difflib.SequenceMatcher(None, un, cand_name.lower()).ratio()
+                            score = difflib.SequenceMatcher(None, target_un, cand_name.lower()).ratio()
                             if score > best_score:
                                 best_score = score
                                 best_match = json.loads(cand_data)
@@ -187,11 +213,60 @@ def resolve_deck_cards(
                             name_map[un] = best_match
         elif state.CARDS:
             for un in unmatched:
+                target_un = alias_targets.get(un, un)
                 for c in state.CARDS:
                     c_name = c.get("name", "").lower()
-                    if c_name.startswith(un + " // "):
+                    if c_name.startswith(target_un + " // "):
                         name_map[un] = slim_card(c)
                         break
+
+    # 3. Online Fallback for Unresolved Cards (Self-healing via Scryfall API)
+    discovered_online: Dict[str, Dict[str, Any]] = {}
+    unmatched_after_offline = [n for n in distinct_names if n not in name_map]
+    if unmatched_after_offline and not offline:
+        from . import api
+        for un in unmatched_after_offline:
+            try:
+                api_card = api.scryfall_fuzzy(un)
+                if api_card and not api_card.get("error") and not isinstance(api_card.get("name"), list):
+                    c_name = api_card.get("name", "")
+                    f_name = api_card.get("flavor_name", "")
+                    p_name = api_card.get("printed_name", "")
+                    candidates = [c_name]
+                    if f_name:
+                        candidates.append(f_name)
+                    if p_name:
+                        candidates.append(p_name)
+                    sim = max((api._similarity(un, cand) for cand in candidates if cand), default=0.0)
+                    if sim >= 0.65 or (f_name and f_name.lower() == un.lower()):
+                        local_card = None
+                        if state.DB_MODE and state.DB is not None:
+                            row = state.DB.execute(
+                                "SELECT data FROM cards WHERE name_lc = ? LIMIT 1",
+                                (c_name.lower(),),
+                            ).fetchone()
+                            if row:
+                                try:
+                                    local_card = json.loads(row[0])
+                                except Exception:
+                                    pass
+                        elif state.CARDS:
+                            for c in state.CARDS:
+                                if c.get("name", "").lower() == c_name.lower():
+                                    local_card = slim_card(c)
+                                    break
+
+                        card_to_use = local_card if local_card else slim_card(api_card)
+                        name_map[un] = card_to_use
+                        alias_targets[un] = c_name.lower()
+                        discovered_online[un] = {
+                            "canonical": c_name,
+                            "flavor_name": f_name or un,
+                        }
+                        # Persist to local alias cache so it resolves offline in future sessions
+                        aliases.save_user_alias(un, c_name)
+            except Exception:
+                pass
 
     # Build final list
     resolved: List[Dict[str, Any]] = []
@@ -200,7 +275,14 @@ def resolve_deck_cards(
     for entry in parsed_entries:
         nlc = entry["name"].lower()
         if nlc in name_map:
-            resolved.append({"entry": entry, "card": name_map[nlc]})
+            card_data = name_map[nlc]
+            item: Dict[str, Any] = {"entry": entry, "card": card_data}
+            if nlc in alias_targets:
+                item["original_alias"] = entry["name"]
+                item["alias_for"] = card_data.get("name", alias_targets[nlc])
+                if nlc in discovered_online:
+                    item["discovered_online"] = True
+            resolved.append(item)
         else:
             failed_names.append(entry["name"])
 
@@ -670,13 +752,14 @@ def run_deck_analysis(
     deck_name: str = "Decklist",
     target_format: str = "commander",
     commander_override: Optional[str] = None,
+    offline: bool = False,
 ) -> Dict[str, Any]:
     """Execute complete decklist analysis and return the comprehensive diagnostic dictionary."""
     parsed = parse_decklist(text_or_lines)
     if not parsed:
         return {"error": "empty_decklist", "message": "No valid card lines found in decklist."}
 
-    resolved, unresolved = resolve_deck_cards(parsed)
+    resolved, unresolved = resolve_deck_cards(parsed, offline=offline)
 
     # Detect Commander
     commander_card = None
@@ -732,6 +815,18 @@ def run_deck_analysis(
     heritage = analyze_heritage(resolved)
     legality_audit = audit_legality(resolved, commander_card, target_format)
 
+    resolved_aliases = []
+    seen_aliases = set()
+    for item in resolved:
+        orig = item.get("original_alias")
+        if orig and orig.lower() not in seen_aliases:
+            seen_aliases.add(orig.lower())
+            resolved_aliases.append({
+                "alias": orig,
+                "canonical": item["card"].get("name", item.get("alias_for", "")),
+                "discovered_online": item.get("discovered_online", False),
+            })
+
     return {
         "deck_name": deck_name,
         "commander": commander_card.get("name") if commander_card else None,
@@ -740,6 +835,7 @@ def run_deck_analysis(
         "total_cards": legality_audit["total_card_count"],
         "is_legal": legality_audit["is_legal"],
         "unresolved_cards": unresolved,
+        "resolved_aliases": resolved_aliases,
         "valuation": {
             "usd_total": round(usd_total, 2),
             "top_expensive": prices_list[:3],

@@ -104,25 +104,45 @@ def _typo_candidates(words):
 
 def _resolve_card(query):
     """Resolve a card name to (card, similarity). Shared by image + machine paths."""
+    from . import aliases
+    alias_canon = aliases.resolve_alias(query)
+    lookup_query = alias_canon if alias_canon else query
+
     # Step 1: Scryfall fuzzy lookup (handles typos + gives us image URLs)
-    api_card = scryfall_fuzzy(query)
+    api_card = scryfall_fuzzy(lookup_query)
+    if (not api_card or api_card.get("error")) and lookup_query != query:
+        api_card = scryfall_fuzzy(query)
     if api_card and api_card.get("error"):
         api_card = None
     if api_card and isinstance(api_card.get("name"), list):
         # Ambiguous match — API returned several candidate names; pick the best one
-        chosen = _api_closest_match(api_card, query)
+        chosen = _api_closest_match(api_card, lookup_query)
         api_card = scryfall_fuzzy(chosen) if chosen else None
         if api_card and api_card.get("error"):
             api_card = None
-    # Guard against unrelated printed-name coincidences (e.g. fuzzy "sol rng"
-    # returning a Portuguese card whose printed name starts with "Sol R")
+    # Guard against unrelated printed-name coincidences, but respect flavor_name
+    # and promotional reskins (e.g. "Tidus's Brotherhood Sword" -> "Sword of Truth and Justice")
     if api_card and not isinstance(api_card.get("name"), list):
-        if _similarity(query, api_card.get("name", "")) < 0.55:
+        target_names = [api_card.get("name", "")]
+        if api_card.get("flavor_name"):
+            target_names.append(api_card.get("flavor_name"))
+        if api_card.get("printed_name"):
+            target_names.append(api_card.get("printed_name"))
+        if alias_canon:
+            target_names.append(alias_canon)
+        max_sim = max((_similarity(query, tn) for tn in target_names if tn), default=0.0)
+        if lookup_query != query:
+            max_sim = max(max_sim, _similarity(lookup_query, api_card.get("name", "")))
+        if max_sim < 0.55:
             api_card = None
 
     # Step 2: Local cache candidates (exact match wins outright)
-    local_exact = search_name(query, exact=True)
-    local_partial = [] if local_exact else search_name(query)
+    local_exact = search_name(lookup_query, exact=True)
+    if not local_exact and lookup_query != query:
+        local_exact = search_name(query, exact=True)
+    local_partial = [] if local_exact else search_name(lookup_query)
+    if not local_partial and lookup_query != query:
+        local_partial = search_name(query)
 
     # Step 3: Typo tolerance — match each query word against cached card names
     local_typo = []

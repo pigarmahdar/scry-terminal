@@ -321,6 +321,27 @@ def display_deck_analysis(res: dict):
             print(f"    {c('[SINGLETON]', '1;31')} {s}")
         for u in unresolved:
             print(f"    {c('[UNRESOLVED]', '1;33')} Could not resolve card: '{u}'")
+        if unresolved:
+            cmd_hint = c("scry search '<name>'", "2")
+            file_hint = c("~/.hermes/scryfall/aliases.json", "2")
+            fn_label = c("flavor name", "1;37")
+            adv_label = c("💡 Flavor Name Advisory:", "1;34")
+            print(f"    {adv_label} If any of these are Secret Lair, promo, or Universes Beyond")
+            print(f"      cards (e.g. Godzilla, Final Fantasy, Sonic), they may be printed with a promotional")
+            print(f"      {fn_label} over a standard Magic card. Check the underlying card name or")
+            print(f"      run {cmd_hint} / add it to {file_hint}.")
+
+    # Display Resolved Flavor Names & Reprints if any
+    resolved_aliases = res.get("resolved_aliases", [])
+    if resolved_aliases:
+        print(f"\n  {c('RESOLVED FLAVOR NAMES & REPRINTS:', '1;36')}")
+        for a in resolved_aliases:
+            orig = a.get("alias", "")
+            canon = a.get("canonical", "")
+            if a.get("discovered_online"):
+                print(f"    {c('✓ [AUTO-RESOLVED]', '1;32')} '{orig}' is a flavor name for {c(canon, '1;37')} {c('(cached locally for offline)', '2')}")
+            else:
+                print(f"    {c('✓ [FLAVOR NAME]', '1;32')} '{orig}' is a flavor name for {c(canon, '1;37')}")
 
     # Pillar 1: Vitals & Mana Health
     mana = res.get("mana_architecture", {})
