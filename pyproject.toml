@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scry-terminal"
+version = "1.0.0"
+description = "Instant, offline Magic: The Gathering card lookups and deck diagnostics from your terminal."
+readme = "README.md"
+authors = [
+    { name = "Pigar Mahdar" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.9"
+keywords = [
+    "magic-the-gathering",
+    "mtg",
+    "scryfall",
+    "cli",
+    "mcp",
+    "model-context-protocol",
+    "deckbuilding",
+    "commander",
+    "terminal"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Games/Entertainment",
+    "Topic :: Utilities",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/pigarmahdar/Scry-Terminal"
+Repository = "https://github.com/pigarmahdar/Scry-Terminal.git"
+Issues = "https://github.com/pigarmahdar/Scry-Terminal/issues"
+
+[project.scripts]
+scry = "scry_cli.cli:main"
+scryfall = "scry_cli.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["scry_cli*"]
+
+[tool.setuptools.package-data]
+"scry_cli" = ["data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+exclude = [
+    ".venv",
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",  # Line too long (handled by ruff format / formatting discretion)
+]

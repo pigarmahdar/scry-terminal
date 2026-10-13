@@ -9,6 +9,15 @@ __pycache__/
 # Virtual environment (dev workspace — never commit)
 .venv/
 
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Test and lint caches
+.pytest_cache/
+.ruff_cache/
+
 # Derived data: SQLite sidecar / index caches built from the oracle JSONL
 oracle-cards.db
 oracle-cards.db-*

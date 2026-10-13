@@ -1,10 +1,13 @@
 # Scry Terminal
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-8A2BE2.svg)](https://modelcontextprotocol.io)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+
 **Instant Magic: The Gathering card lookups from your terminal. No API key, no rate limits, no internet.**
 
 `scry` searches the full Scryfall Oracle database (~38,000 cards) from a local copy on your disk. Results come back in **~50 ms** — fast enough to fire a dozen lookups while you're mid-deckbuild — and the tool works completely offline once installed.
-
-
 
 It's built for two audiences at once:
 
@@ -13,17 +16,34 @@ It's built for two audiences at once:
 
 For MTG brewers, script writers, and AI assistants who want instant, distraction-free answers, Scry Terminal is an offline diagnostic engine and CLI toolkit that validates card rules, deck architecture, and mana math in sub-50ms—without web bloat, rate limits, or context switching.
 
+---
+
+[Features](#what-it-can-do) • 
+[Install](#install) • 
+[Try It](#try-it) • 
+[Command Reference](#command-reference) • 
+[Deck Diagnostics](#deck-diagnostics--architecture-the-deck-linter) • 
+[AI Agents & MCP](#for-developers-agents-and-scripts) • 
+[How It Works](#how-it-works) • 
+[Contributing](#contributing) • 
+[License](#license)
+
+---
+
 ## Install
 
-Requires Python 3.6+ and ~200 MB for the card cache.
+Requires Python 3.9+ and ~200 MB for the card cache.
+
+### Quickstart (Git Clone)
 
 ```shell
-git clone https://github.com/pigarmahdar/scryfall-local.git
-cd scryfall-local
-mkdir -p ~/.hermes/scryfall
-curl -o ~/.hermes/scryfall/oracle-cards.jsonl \
-  "https://data.scryfall.io/oracle-cards/oracle-cards.jsonl"
+# 1. Clone repository
+git clone https://github.com/pigarmahdar/Scry-Terminal.git
+cd Scry-Terminal
 chmod +x scry
+
+# 2. Populate the local card cache & build the SQLite search index
+./scry update
 ```
 
 Run it in place (`./scry name "Sol Ring"`), or put it on your PATH:
@@ -37,7 +57,18 @@ ln -s ~/.local/lib/scry-terminal/scryfall ~/.local/bin/scryfall
 
 *(Note: `scryfall` is kept as a symlink/shim to `scry` so existing workflows and muscle memory don't break).*
 
-The cache updates itself on demand (`scry update`), and the first query builds a search index automatically — nothing to configure.
+### Packaging & Distribution Roadmap
+
+- **pip / pipx**: `pipx install git+https://github.com/pigarmahdar/Scry-Terminal.git` (or local `pipx install .`)
+- **Homebrew tap** *(Planned)*: `brew tap pigarmahdar/tap && brew install scry`
+- **Pre-compiled standalone binaries** *(Planned)*: Self-contained single binaries distributed via GitHub Releases.
+
+> **Offline / Manual Cache Setup**: If you prefer not to use `scry update`, you can fetch the dataset directly:
+> ```shell
+> mkdir -p ~/.hermes/scryfall
+> curl -o ~/.hermes/scryfall/oracle-cards.jsonl \
+>   "https://data.scryfall.io/oracle-cards/oracle-cards.jsonl"
+> ```
 
 ## Try it
 
@@ -248,6 +279,12 @@ tests/
 ```
 
 Imports only point downward: `state → project → store → search → api/display → cli`. `state.py` is the only module allowed to hold mutable state; everything else reads and writes `state.<NAME>` attribute access so every module sees one object.
+
+## Contributing
+
+Contributions, bug reports, and pull requests are welcome!
+
+Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on code style (Ruff), architectural constraints (downward imports), and running the test gates.
 
 ## Data source and Disclaimers
 
