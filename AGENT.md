@@ -82,7 +82,7 @@ Run `scry <command> "<query>" [flags]` via your shell/bash tool (`scryfall` also
 | `doctor` | Report index health/staleness | `scry doctor` |
 
 Useful flags: `--limit N` (default 10), `--legal commander|modern|legacy|pauper|vintage`,
-`--commander WUBRG` (identity fits within these colours), `--exact`, `--commander-card <name>`.
+`--commander WUBRG` (identity fits within these colours), `--exact`, `--commander-card <name>`, `--help`.
 
 `oracle` ignores `--commander`, `--legal`, and `--sort` (it is a lookup, not a
 browse) and warns on stderr when they are passed. It accepts `--limit`, `--format`,
@@ -143,6 +143,13 @@ hallucinate a download.
   "total_cards": 100,
   "is_legal": true,
   "unresolved_cards": [],
+  "resolved_aliases": [
+    {"alias": "Master Emerald Shrine", "canonical": "Command Tower", "discovered_online": false}
+  ],
+  "valuation": {
+    "usd_total": 245.50,
+    "top_expensive": [["Sleight of Mind", 15.0], ["Counterspell", 2.5]]
+  },
   "mana_architecture": {
     "lands_count": 36, "ramp_count": 8, "avg_cmc_nonlands": 2.94, "turn_1_to_3_playables": 34,
     "pip_pct": {"W": 32.0, "U": 68.0}, "source_pct": {"W": 34.0, "U": 66.0},
@@ -165,6 +172,10 @@ hallucinate a download.
   }
 }
 ```
+
+Field details for `deck`:
+- `resolved_aliases`: cards recognized under promo/flavor reskins (e.g. Universes Beyond, Godzilla, Secret Lair) mapped to their canonical Oracle card name, plus boolean `discovered_online` (true if resolved via Scryfall API and cached locally).
+- `valuation`: market pricing audit containing `usd_total` (sum of cached printing prices) and `top_expensive` (top 3 highest-value cards as `[card_name, price]` pairs).
 
 All other commands emit JSONL: zero or more card records, one per line.
 

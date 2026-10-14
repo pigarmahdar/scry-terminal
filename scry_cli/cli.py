@@ -23,6 +23,7 @@ Commands:
   image <name>        Download PNG image of a card (to Desktop by default)
   deck <file>         Analyze a decklist (mana curve, colors, engines, format audit)
   update              Update the Oracle cache from Scryfall
+  help                Show this help message and exit
 
 Options:
   --limit N           Max results (default: 10)
@@ -37,6 +38,7 @@ Options:
                       Default is auto-detected: pretty on a terminal, jsonl when
                       piped or redirected. Env override: SCRY_FORMAT=<fmt>.
                       NO_COLOR=1 strips ANSI styling from pretty output.
+  --help, -h          Show this help message and exit
 
 Machine-readable output (json/jsonl/csv/tsv):
   When stdout is not a terminal — e.g. an LLM harness, script, or pipe — the
@@ -101,7 +103,8 @@ def parse_args(args):
     command = None
     query_parts = []
     options = {"limit": 10, "commander": None, "legal": None, "exact": False, "sort": None,
-               "size": None, "out": None, "border": None, "format": None, "commander_card": None}
+               "size": None, "out": None, "border": None, "format": None, "commander_card": None,
+               "help": False}
 
     i = 0
     while i < len(args):
@@ -160,6 +163,9 @@ def parse_args(args):
             i += 1
         elif arg == "--offline":
             options["offline"] = True
+            i += 1
+        elif arg in ("--help", "-h"):
+            options["help"] = True
             i += 1
         elif arg.startswith("--"):
             # Unknown flag: emit structured error (stdout is still pure data)
@@ -448,6 +454,10 @@ def main():
         return
 
     command, query, options = parse_args(sys.argv[1:])
+
+    if options.get("help") or command == "help":
+        print(__doc__)
+        return
 
     # Resolve output format: flag > $SCRYFALL_FORMAT > TTY auto-detect
     state.MODE = resolve_format(options.get("format"))

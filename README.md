@@ -195,6 +195,7 @@ Exposed native tools:
 | `--json` / `--jsonl` / `--csv` / `--tsv` | Shorthands for `--format` |
 | `--pretty` | Force human-styled output even when piped |
 | `--no-db` | Bypass the search index (debugging) |
+| `--help` / `-h` | Display usage and options text |
 
 ## Deck Diagnostics & Architecture (The Deck Linter)
 
