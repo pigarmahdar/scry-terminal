@@ -36,3 +36,24 @@ jobs:
           pip install -e .
       - name: Run unit test suite
         run: pytest tests/test_deck.py
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build and check distributions
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+          python -m build
+          twine check dist/*
+      - name: Install wheel in isolation and smoke-test entry points
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install dist/*.whl
+          /tmp/smoke/bin/scry --help
+          /tmp/smoke/bin/scryfall --help
+          /tmp/smoke/bin/scry doctor

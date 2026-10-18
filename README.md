@@ -32,34 +32,36 @@ For MTG brewers, script writers, and AI assistants who want instant, distraction
 
 ## Install
 
-Requires Python 3.9+ and ~200 MB for the card cache.
+Requires Python 3.9+ and ~200 MB for the card cache (downloaded separately — installing the package itself fetches ~0 bytes of card data).
 
-### Quickstart (Git Clone)
+### Recommended: pipx (isolated CLI)
 
 ```shell
-# 1. Clone repository
+pipx install scry-terminal
+scry update   # one-time: downloads the Oracle cache & builds the search index
+```
+
+### Alternative: pip
+
+```shell
+pip install scry-terminal
+scry update
+```
+
+Both `scry` and `scryfall` (backwards-compatible alias) are placed on your PATH automatically.
+
+### Developer: git clone
+
+```shell
 git clone https://github.com/pigarmahdar/Scry-Terminal.git
 cd Scry-Terminal
-chmod +x scry
-
-# 2. Populate the local card cache & build the SQLite search index
-./scry update
+pip install -e .
+scry update
 ```
-
-Run it in place (`./scry name "Sol Ring"`), or put it on your PATH:
-
-```shell
-mkdir -p ~/.local/lib/scry-terminal
-cp -r scry scryfall scry_cli ~/.local/lib/scry-terminal/
-ln -s ~/.local/lib/scry-terminal/scry ~/.local/bin/scry
-ln -s ~/.local/lib/scry-terminal/scryfall ~/.local/bin/scryfall
-```
-
-*(Note: `scryfall` is kept as a symlink/shim to `scry` so existing workflows and muscle memory don't break).*
 
 ### Packaging & Distribution Roadmap
 
-- **pip / pipx**: `pipx install git+https://github.com/pigarmahdar/Scry-Terminal.git` (or local `pipx install .`)
+- **pip / pipx**: `pip install scry-terminal` ✅ (this release)
 - **Homebrew tap** *(Planned)*: `brew tap pigarmahdar/tap && brew install scry`
 - **Pre-compiled standalone binaries** *(Planned)*: Self-contained single binaries distributed via GitHub Releases.
 
