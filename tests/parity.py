@@ -28,8 +28,8 @@ REPO = os.path.dirname(HERE)
 # (Stage 1's parity harness had to load the single-file script by path because
 #  it wasn't importable; the package split removed that friction.)
 sys.path.insert(0, REPO)
-import scry_cli as cli            # noqa: E402
-from scry_cli import state        # noqa: E402  (shared mutable state)
+import scry_cli as cli  # noqa: E402
+from scry_cli import state  # noqa: E402  (shared mutable state)
 
 
 def load_both():
@@ -190,7 +190,6 @@ def compare_oracle(case, query):
 
 def main():
     verbose = "-v" in sys.argv
-    pattern = next((a for a in sys.argv[1:] if not a.startswith("-")), None)
     total_lines = load_both()
     print("legacy rows: %s   index: ready\n" % format(total_lines, ","))
 

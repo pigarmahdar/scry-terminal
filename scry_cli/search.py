@@ -9,9 +9,12 @@ import random as rng
 
 from . import state
 from .project import text_card  # noqa: F401  (oracle display projection)
-from .state import warn, fmt
+from .state import fmt, warn
 from .store import (
-    _hydrate, _like_pattern, _substr_rows, _any_substr_rows,
+    _any_substr_rows,
+    _hydrate,
+    _like_pattern,
+    _substr_rows,
 )
 
 # ── Canonical card-text lookup (`oracle`) ────────────────────────────────

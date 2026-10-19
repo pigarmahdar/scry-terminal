@@ -232,6 +232,18 @@ class TestDeckDiagnostics(unittest.TestCase):
 
 class TestDeckResolutionFallback(unittest.TestCase):
 
+    def setUp(self):
+        self._orig_cards = state.CARDS
+        self._orig_db_mode = state.DB_MODE
+        self._orig_force = state.FORCE_NO_DB
+        self._orig_db = state.DB
+
+    def tearDown(self):
+        state.CARDS = self._orig_cards
+        state.DB_MODE = self._orig_db_mode
+        state.FORCE_NO_DB = self._orig_force
+        state.DB = self._orig_db
+
     def test_offline_fallback_with_memory_cards(self):
         state.CARDS = [
             {

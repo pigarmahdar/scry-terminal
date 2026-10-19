@@ -6,10 +6,10 @@ All of these print() to stdout with ANSI styling gated by USE_COLOR (state.USE_C
 import os
 import re
 
-from . import state
-from .state import COLOUR_SYMBOLS, c, fmt, warn, machine_mode
+from .api import USER_AGENT, _api_get, _resolve_card
 from .project import emit_single
-from .api import _resolve_card, _api_get, USER_AGENT
+from .state import COLOUR_SYMBOLS, c, fmt, machine_mode, warn
+
 
 # ── Display a single card ───────────────────────────────────────────────
 def display_card(card, index=None):
@@ -327,7 +327,7 @@ def display_deck_analysis(res: dict):
             fn_label = c("flavor name", "1;37")
             adv_label = c("💡 Flavor Name Advisory:", "1;34")
             print(f"    {adv_label} If any of these are Secret Lair, promo, or Universes Beyond")
-            print(f"      cards (e.g. Godzilla, Final Fantasy, Sonic), they may be printed with a promotional")
+            print("      cards (e.g. Godzilla, Final Fantasy, Sonic), they may be printed with a promotional")
             print(f"      {fn_label} over a standard Magic card. Check the underlying card name or")
             print(f"      run {cmd_hint} / add it to {file_hint}.")
 
@@ -359,7 +359,7 @@ def display_deck_analysis(res: dict):
 
     active_colors = [col for col in ("W", "U", "B", "R", "G") if pip_dem.get(col, 0) > 0 or source_pct.get(col, 0) > 0]
     if active_colors:
-        print(f"    Mana Balance:")
+        print("    Mana Balance:")
         for col in active_colors:
             sym = COLOUR_SYMBOLS.get(col, col)
             p_p = pip_pct.get(col, 0.0)

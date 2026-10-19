@@ -16,8 +16,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from . import state
 from .project import slim_card
-from .state import warn
-
 
 # ── Decklist Parsing ──────────────────────────────────────────────────────
 
@@ -763,7 +761,6 @@ def run_deck_analysis(
 
     # Detect Commander
     commander_card = None
-    commander_entry = None
 
     if commander_override:
         # User explicitly passed --commander-card
@@ -771,14 +768,12 @@ def run_deck_analysis(
         for item in resolved:
             if item["card"].get("name", "").lower() == cleaned_override:
                 commander_card = item["card"]
-                commander_entry = item["entry"]
                 break
     else:
         # 1. Check if an item was tagged in 'commander' section
         for item in resolved:
             if item["entry"]["section"] == "commander":
                 commander_card = item["card"]
-                commander_entry = item["entry"]
                 break
 
         # 2. Auto-detect if there is exactly 1 Legendary Creature or Planeswalker
@@ -791,7 +786,6 @@ def run_deck_analysis(
             ]
             if len(legends) == 1:
                 commander_card = legends[0]["card"]
-                commander_entry = legends[0]["entry"]
 
     # Calculate Market Value
     usd_total = 0.0

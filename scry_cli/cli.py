@@ -77,23 +77,45 @@ import os
 import sys
 
 from . import state
-from .state import (
-    VALID_FORMATS, ORACLE_PATH, DB_PATH, SCHEMA_VERSION,
-    machine_mode, resolve_format, _colors_enabled, c, fmt, warn,
-)
-from .project import emit_single, emit_records, text_card, slim_card  # noqa: F401
-from .store import (
-    _sqlite_module, _sqlite_supports_fts5, db_status, build_db, load_cards,
-)
-from .search import (
-    search_name, search_text, search_type, search_color, search_cmc,
-    search_keyword, search_general, search_random, search_oracle,
-    apply_filters, sort_results,
-)
-from .api import handle_fuzzy, SCRYFALL_API  # noqa: F401
+from .api import SCRYFALL_API, handle_fuzzy  # noqa: F401
 from .display import (
-    display_card, display_oracle_card, display_price_card, handle_image,
+    display_card,
     display_deck_analysis,
+    display_oracle_card,
+    display_price_card,
+    handle_image,
+)
+from .project import emit_records, emit_single, slim_card, text_card  # noqa: F401
+from .search import (
+    apply_filters,
+    search_cmc,
+    search_color,
+    search_general,
+    search_keyword,
+    search_name,
+    search_oracle,
+    search_random,
+    search_text,
+    search_type,
+    sort_results,
+)
+from .state import (
+    DB_PATH,
+    ORACLE_PATH,
+    SCHEMA_VERSION,
+    _colors_enabled,
+    c,
+    fmt,
+    machine_mode,
+    resolve_format,
+    warn,
+)
+from .store import (
+    _sqlite_module,
+    _sqlite_supports_fts5,
+    build_db,
+    db_status,
+    load_cards,
 )
 
 
@@ -601,7 +623,7 @@ def main():
 
     # Display
     if not results:
-        print(f"\n  No cards found matching your search.")
+        print("\n  No cards found matching your search.")
         return
 
     if total > shown:

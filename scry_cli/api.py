@@ -9,10 +9,11 @@ import json
 import re
 
 from . import state
-from .state import c, warn, fmt, machine_mode
 from .project import emit_single, slim_card
 from .search import search_name
-from .store import _hydrate, _fts_phrase
+from .state import c, fmt, machine_mode
+from .store import _fts_phrase, _hydrate
+
 # display imports are local (inside handle_fuzzy) to avoid a module-level cycle:
 
 # ── Scryfall API calls for fuzzy matching ─────────────────────────────
@@ -286,7 +287,7 @@ def handle_fuzzy(query, options=None):
     single JSON object {query, match, candidates} instead of prompting with
     input(), which would hang an LLM harness forever.
     """
-    from .display import display_card, display_api_card  # local: display imports api
+    from .display import display_api_card, display_card  # local: display imports api
     if not query:
         print("\n  Usage: scryfall fuzzy <card name>")
         return
@@ -335,7 +336,7 @@ def handle_fuzzy(query, options=None):
     print("  " + c('Did you mean…', '1;36'))
     for i, name in enumerate(suggestions, 1):
         print(f"    [{i}] {name}")
-    print(f"    [0] Cancel\n")
+    print("    [0] Cancel\n")
 
     try:
         choice = input("  Pick a number: ").strip()

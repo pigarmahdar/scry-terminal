@@ -11,7 +11,7 @@ import time
 
 from . import state
 from .project import slim_card
-from .state import ORACLE_PATH, DB_PATH, SCHEMA_VERSION, warn
+from .state import DB_PATH, ORACLE_PATH, SCHEMA_VERSION, warn
 
 # ── SQLite sidecar (Option C, design doc §3) ────────────────────────────
 # The JSONL stays canonical; this DB is a derived, rebuildable index.

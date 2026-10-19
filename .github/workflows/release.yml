@@ -52,3 +52,4 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+          append_body: true
