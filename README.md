@@ -179,6 +179,8 @@ Exposed native tools:
 | `update` | Update the Oracle cache from Scryfall | `scry update` |
 | `reindex` | Rebuild the local search index | `scry reindex` |
 | `doctor` | Report index health and staleness | `scry doctor` |
+| `completion` | Generate shell completions (bash, zsh, fish) | `source <(scry completion zsh)` |
+| `version` | Show installed version | `scry version` |
 
 ### Flags
 
@@ -197,6 +199,7 @@ Exposed native tools:
 | `--json` / `--jsonl` / `--csv` / `--tsv` | Shorthands for `--format` |
 | `--pretty` | Force human-styled output even when piped |
 | `--no-db` | Bypass the search index (debugging) |
+| `--version` / `-v` | Display version and exit |
 | `--help` / `-h` | Display usage and options text |
 
 ## Deck Diagnostics & Architecture (The Deck Linter)

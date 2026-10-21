@@ -6,7 +6,6 @@ only module allowed to *write* DB/DB_MODE/CARDS after startup.
 """
 import json
 import os
-import sys
 import time
 
 from . import state
@@ -209,7 +208,7 @@ def check_cache_age():
         mtime = os.stat(ORACLE_PATH).st_mtime
         age_days = int((time.time() - mtime) / 86400)
         if age_days > 30:
-            warn(f"card cache is {age_days} days old — run 'scryfall update' to refresh")
+            warn(f"card cache is {age_days} days old — run 'scry update' to refresh")
     except OSError:
         pass
 
@@ -229,9 +228,8 @@ def load_cards():
     if state.CARDS:
         return
     if not os.path.exists(ORACLE_PATH):
-        print(f"Error: Oracle cards file not found at {ORACLE_PATH}", file=sys.stderr)
-        print("Run the Scryfall cache update first.", file=sys.stderr)
-        sys.exit(1)
+        from .onboarding import handle_missing_cache
+        handle_missing_cache()
 
     if not state.FORCE_NO_DB:
         sq = _sqlite_module()
@@ -262,6 +260,12 @@ def _load_cards_jsonl():
                     continue
 
 # ── DB query helpers ────────────────────────────────────────────────────
+class SearchResult(list):
+    """List of card dicts carrying an untruncated match count for Honest Limit display."""
+    def __init__(self, cards=(), total=None):
+        super().__init__(cards)
+        self.total = len(cards) if total is None else total
+
 def _hydrate(rows):
     """Turn rows of ('data' column) into card dicts, preserving row order."""
     return [json.loads(r[0]) for r in rows]
@@ -274,39 +278,119 @@ def _like_pattern(q):
 # cards_ft column -> cards column (None = no cheap column, scan data instead).
 _FT_TO_COL = {"name": "name_lc"}
 
-def _substr_rows(ft_column, query):
-    """Rows matching `query` as a true substring of one FTS-indexed field.
+def _commander_clause(allowed_colors):
+    """Return (sql_cond, params) for commander color identity subset check."""
+    if allowed_colors is not None and not allowed_colors:
+        # Colorless commander: card must have NO colors in colors table
+        return "c.rid NOT IN (SELECT rid FROM colors)", ()
+    if allowed_colors:
+        forbidden = sorted(set("WUBRG") - set(allowed_colors))
+        if forbidden:
+            placeholders = ",".join("?" * len(forbidden))
+            return f"c.rid NOT IN (SELECT rid FROM colors WHERE color IN ({placeholders}))", tuple(forbidden)
+    return "", ()
 
-    Length-gated router (design doc §3.3): the trigram tokenizer needs >= 3
-    characters and SILENTLY returns zero rows below that — measured on this
-    cache, "a" gives 29,707 LIKE matches vs 0 from trigram, "so" 1,199 vs 0,
-    "ri" 5,302 vs 0. So short queries must take the LIKE path, never FTS.
-    """
+def _legal_clause(legal_format):
+    """Return (sql_cond, params) for format legality."""
+    if legal_format:
+        return "json_extract(c.data, ?) = 'legal'", (f"$.legalities.{legal_format.lower()}",)
+    return "", ()
+
+def _sort_clause(sort_key):
+    """Return SQL ORDER BY clause matching Python sort_results semantics."""
+    if sort_key == "name":
+        return "c.name_lc, c.rid"
+    elif sort_key == "cmc":
+        return "c.cmc, c.rid"
+    elif sort_key == "price":
+        return "coalesce(cast(json_extract(c.data, '$.prices.usd') as real), 0.0) DESC, c.rid"
+    return "c.rid"
+
+def _query_cards(from_clause, where_clauses, params=(), limit=None, allowed_colors=None, legal=None, sort=None):
+    """Execute query with pushed-down predicates, order, and limit probe."""
+    where_parts = [w for w in where_clauses if w]
+    query_params = list(params)
+
+    # Push down legal
+    l_clause, l_params = _legal_clause(legal)
+    if l_clause:
+        where_parts.append(l_clause)
+        query_params.extend(l_params)
+
+    # Push down commander
+    c_clause, c_params = _commander_clause(allowed_colors)
+    if c_clause:
+        where_parts.append(c_clause)
+        query_params.extend(c_params)
+
+    where_sql = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
+    order_sql = " ORDER BY " + _sort_clause(sort)
+
+    if limit is None:
+        sql = f"SELECT c.data FROM {from_clause}{where_sql}{order_sql}"
+        rows = state.DB.execute(sql, query_params).fetchall()
+        return SearchResult(_hydrate(rows), total=len(rows))
+
+    if limit == 0:
+        count_sql = f"SELECT count(*) FROM {from_clause}{where_sql}"
+        total = state.DB.execute(count_sql, query_params).fetchone()[0]
+        return SearchResult([], total=total)
+
+    # Probe with limit + 1: if matches <= limit, avoids a second count query entirely
+    probe_sql = f"SELECT c.data FROM {from_clause}{where_sql}{order_sql} LIMIT {limit + 1}"
+    rows = state.DB.execute(probe_sql, query_params).fetchall()
+    if len(rows) <= limit:
+        return SearchResult(_hydrate(rows), total=len(rows))
+
+    # Matches exceed limit: fetch exact count for Honest Limit display
+    count_sql = f"SELECT count(*) FROM {from_clause}{where_sql}"
+    total = state.DB.execute(count_sql, query_params).fetchone()[0]
+    return SearchResult(_hydrate(rows[:limit]), total=total)
+
+def _substr_cards(ft_column, query, limit=None, allowed_colors=None, legal=None, sort=None):
+    """Cards matching `query` as a true substring of one FTS-indexed field."""
     q = query.lower()
     if len(q) >= 3:
-        sql = ("SELECT c.data FROM cards c JOIN cards_ft f ON f.rowid = c.rid"
-               " WHERE f.%s MATCH ? ORDER BY c.rid" % ft_column)
-        return state.DB.execute(sql, (_fts_phrase(q),)).fetchall()
+        from_clause = "cards c JOIN cards_ft f ON f.rowid = c.rid"
+        where_clauses = ["f.%s MATCH ?" % ft_column]
+        return _query_cards(from_clause, where_clauses, (_fts_phrase(q),),
+                            limit=limit, allowed_colors=allowed_colors, legal=legal, sort=sort)
     col = _FT_TO_COL.get(ft_column)
     if col:
-        sql = "SELECT data FROM cards WHERE %s LIKE ? ESCAPE '\\' ORDER BY rid" % col
-        return state.DB.execute(sql, (_like_pattern(q),)).fetchall()
-    # No promoted column for this field (oracle_text/type_line): fall back to a
-    # JSON-extract scan, which is still one pass, not 38k parses.
+        from_clause = "cards c"
+        where_clauses = ["c.%s LIKE ? ESCAPE '\\'" % col]
+        return _query_cards(from_clause, where_clauses, (_like_pattern(q),),
+                            limit=limit, allowed_colors=allowed_colors, legal=legal, sort=sort)
     key = {"oracle_text": "$.oracle_text", "type_line": "$.type_line"}[ft_column]
-    sql = ("SELECT data FROM cards"
-           " WHERE lower(json_extract(data, '%s')) LIKE ? ESCAPE '\\' ORDER BY rid" % key)
-    return state.DB.execute(sql, (_like_pattern(q),)).fetchall()
+    from_clause = "cards c"
+    where_clauses = ["lower(json_extract(c.data, '%s')) LIKE ? ESCAPE '\\'" % key]
+    return _query_cards(from_clause, where_clauses, (_like_pattern(q),),
+                        limit=limit, allowed_colors=allowed_colors, legal=legal, sort=sort)
 
-def _any_substr_rows(query):
-    """Rows whose name OR oracle text OR type line contains `query`."""
+def _any_substr_cards(query, limit=None, allowed_colors=None, legal=None, sort=None):
+    """Cards whose name OR oracle text OR type line contains `query`."""
     q = query.lower()
     if len(q) >= 3:
-        sql = ("SELECT c.data FROM cards c JOIN cards_ft f ON f.rowid = c.rid"
-               " WHERE cards_ft MATCH ? ORDER BY c.rid")
-        return state.DB.execute(sql, (_fts_phrase(q),)).fetchall()
-    sql = ("SELECT data FROM cards WHERE name_lc LIKE :p ESCAPE '\\'"
-           " OR lower(json_extract(data, '$.oracle_text')) LIKE :p ESCAPE '\\'"
-           " OR lower(json_extract(data, '$.type_line')) LIKE :p ESCAPE '\\'"
-           " ORDER BY rid")
-    return state.DB.execute(sql, {"p": _like_pattern(q)}).fetchall()
+        from_clause = "cards c JOIN cards_ft f ON f.rowid = c.rid"
+        where_clauses = ["cards_ft MATCH ?"]
+        return _query_cards(from_clause, where_clauses, (_fts_phrase(q),),
+                            limit=limit, allowed_colors=allowed_colors, legal=legal, sort=sort)
+    from_clause = "cards c"
+    pat = _like_pattern(q)
+    where_clauses = [
+        "(c.name_lc LIKE ? ESCAPE '\\'"
+        " OR lower(json_extract(c.data, '$.oracle_text')) LIKE ? ESCAPE '\\'"
+        " OR lower(json_extract(c.data, '$.type_line')) LIKE ? ESCAPE '\\')"
+    ]
+    return _query_cards(from_clause, where_clauses, (pat, pat, pat),
+                        limit=limit, allowed_colors=allowed_colors, legal=legal, sort=sort)
+
+def _substr_rows(ft_column, query):
+    """Legacy helper: rows matching `query` as raw tuples (kept for compatibility)."""
+    res = _substr_cards(ft_column, query)
+    return [[json.dumps(c, ensure_ascii=False)] for c in res]
+
+def _any_substr_rows(query):
+    """Legacy helper: rows matching `query` as raw tuples (kept for compatibility)."""
+    res = _any_substr_cards(query)
+    return [[json.dumps(c, ensure_ascii=False)] for c in res]

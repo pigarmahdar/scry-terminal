@@ -83,9 +83,13 @@ def compare(case, fn_name, args, kwargs=None, expect_nonempty=True):
         # Describe the first divergence for the failure message
         detail = describe_diff(lp, dp, legacy, db)
         return Result(case, False, detail)
+    l_tot = getattr(legacy, "total", len(legacy))
+    d_tot = getattr(db, "total", len(db))
+    if l_tot != d_tot:
+        return Result(case, False, "total mismatch: %s (legacy) vs %s (db)" % (l_tot, d_tot))
     if expect_nonempty and not lp:
         return Result(case, True, "both empty (suspicious: query matched nothing)")
-    return Result(case, True, "%d rows" % len(lp))
+    return Result(case, True, "%d rows (total %d)" % (len(lp), d_tot))
 
 
 def describe_diff(lp, dp, legacy, db):
@@ -243,6 +247,41 @@ def main():
         results.append(compare("search %r" % q, "search_general", (q,)))
     for q in ORACLE_QUERIES:
         results.append(compare_oracle("oracle %r" % q, q))
+
+    # Stage 2 Pushdown Optimization checks: limit, legal, commander, sort
+    PUSHDOWN_CASES = [
+        ("type 'creature' limit 5", "search_type", ("creature",), {"limit": 5}),
+        ("type 'creature' legal commander limit 10", "search_type", ("creature",),
+         {"legal": "commander", "limit": 10}),
+        ("type 'creature' commander WG limit 10", "search_type", ("creature",),
+         {"commander": "WG", "limit": 10}),
+        ("type 'creature' commander C limit 10", "search_type", ("creature",),
+         {"commander": "C", "limit": 10}),
+        ("type 'creature' commander Atraxa limit 10", "search_type", ("creature",),
+         {"commander": "Atraxa, Praetors' Voice", "limit": 10}),
+        ("type 'creature' sort price limit 5", "search_type", ("creature",),
+         {"sort": "price", "limit": 5}),
+        ("type 'creature' sort cmc limit 5", "search_type", ("creature",),
+         {"sort": "cmc", "limit": 5}),
+        ("type 'creature' sort name limit 5", "search_type", ("creature",),
+         {"sort": "name", "limit": 5}),
+        ("cmc '<=3' limit 10", "search_cmc", ("<=3",), {"limit": 10}),
+        ("cmc '<=3' legal modern limit 10", "search_cmc", ("<=3",),
+         {"legal": "modern", "limit": 10}),
+        ("name 'a' limit 10", "search_name", ("a",), {"limit": 10}),
+        ("name 'sol ring' exact limit 5", "search_name", ("sol ring",),
+         {"exact": True, "limit": 5}),
+        ("text 'counter target spell' limit 5", "search_text", ("counter target spell",),
+         {"limit": 5}),
+        ("color 'WG' legal modern limit 5", "search_color", ("WG",),
+         {"legal": "modern", "limit": 5}),
+        ("keyword 'flying' commander U limit 5", "search_keyword", ("flying",),
+         {"commander": "U", "limit": 5}),
+        ("search 'treasure' sort price limit 10", "search_general", ("treasure",),
+         {"sort": "price", "limit": 10}),
+    ]
+    for case_name, fn_name, args, kwargs in PUSHDOWN_CASES:
+        results.append(compare(case_name, fn_name, args, kwargs))
 
     # random: same shape + membership, not identity (it is random)
     state.DB_MODE = False

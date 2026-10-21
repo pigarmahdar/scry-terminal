@@ -8,6 +8,12 @@ other in-process consumer needs. Mutable state (DB / DB_MODE / CARDS / MODE /
 USE_COLOR / FORCE_NO_DB) is NOT re-exported: import `scry_cli.state` and
 mutate its attributes so every module sees one object.
 """
+try:
+    from importlib.metadata import version as _get_version
+    __version__ = _get_version("scry-terminal")
+except Exception:
+    __version__ = "1.0.0"
+
 from .api import _resolve_card, scryfall_autocomplete, scryfall_fuzzy  # noqa: F401
 from .cli import VALID_COMMANDS, main, parse_args  # noqa: F401
 from .display import (  # noqa: F401

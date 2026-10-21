@@ -17,6 +17,12 @@ This repository is linked with notes in the **[Bacon Notes](obsidian://open?vaul
 
 ## 📂 Features & Specifications
 
+### Dashboard
+
+| Document | Category | Quick Link |
+| :--- | :--- | :--- |
+| `Interactive Growth Dashboard.md` | 📝 Note | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Dashboard/Interactive%20Growth%20Dashboard) |
+
 ### Deck Analysis
 
 | Document | Category | Quick Link |
@@ -45,11 +51,20 @@ This repository is linked with notes in the **[Bacon Notes](obsidian://open?vaul
 | :--- | :--- | :--- |
 | `01 Plan - Oracle Command.md` | 📋 Plan | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Oracle%20Command/01%20Plan%20-%20Oracle%20Command) |
 
+### Pip Installable
+
+| Document | Category | Quick Link |
+| :--- | :--- | :--- |
+| `01 Plan - PIP Installable.md` | 📋 Plan | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Pip%20Installable/01%20Plan%20-%20PIP%20Installable) |
+| `02 Walkthrough - Pip Installable.md` | 🚀 Walkthrough | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Pip%20Installable/02%20Walkthrough%20-%20Pip%20Installable) |
+
 ### Startup Cost
 
 | Document | Category | Quick Link |
 | :--- | :--- | :--- |
 | `01 Plan - Fixing Startup Cost.md` | 📋 Plan | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Startup%20Cost/01%20Plan%20-%20Fixing%20Startup%20Cost) |
+| `01 Plan - Stage 2 QoL Efficiency.md` | 📋 Plan | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Startup%20Cost/01%20Plan%20-%20Stage%202%20QoL%20Efficiency) |
+| `02 Walkthrough - Stage 2 QoL Efficiency.md` | 🚀 Walkthrough | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Startup%20Cost/02%20Walkthrough%20-%20Stage%202%20QoL%20Efficiency) |
 
 
 ---

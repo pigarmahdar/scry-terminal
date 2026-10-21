@@ -11,10 +11,14 @@ from . import state
 from .project import text_card  # noqa: F401  (oracle display projection)
 from .state import fmt, warn
 from .store import (
-    _any_substr_rows,
+    SearchResult,
+    _any_substr_cards,
+    _commander_clause,
     _hydrate,
+    _legal_clause,
     _like_pattern,
-    _substr_rows,
+    _query_cards,
+    _substr_cards,
 )
 
 # ── Canonical card-text lookup (`oracle`) ────────────────────────────────
@@ -126,21 +130,31 @@ def search_oracle(query, limit=None):
 # JSONL line order so --limit tie-breaking inside sort_results (a stable sort)
 # picks the same survivors as before.
 
-def search_name(query, exact=False):
+def _legacy_finish(results, limit=None, commander=None, legal=None, sort=None):
+    if commander or legal:
+        results = apply_filters(results, commander=commander, legal=legal)
+    if sort:
+        results = sort_results(results, sort)
+    total = len(results)
+    shown = results[:limit] if limit is not None else results
+    return SearchResult(shown, total=total)
+
+def search_name(query, exact=False, limit=None, commander=None, legal=None, sort=None):
     query_lower = query.lower().strip('"')
     if state.DB_MODE:
+        allowed = _resolve_commander_identity(commander) if commander else None
         if exact:
-            rows = state.DB.execute("SELECT data FROM cards WHERE name_lc = ? ORDER BY rid",
-                              (query_lower,)).fetchall()
-            if not rows:
+            res = _query_cards("cards c", ["c.name_lc = ?"], (query_lower,),
+                               limit=limit, allowed_colors=allowed, legal=legal, sort=sort)
+            if not res:
                 from . import aliases
                 canon = aliases.resolve_alias(query_lower)
                 if canon:
-                    rows = state.DB.execute("SELECT data FROM cards WHERE name_lc = ? ORDER BY rid",
-                                            (canon.lower(),)).fetchall()
-        else:
-            rows = _substr_rows("name", query_lower)
-        return _hydrate(rows)
+                    res = _query_cards("cards c", ["c.name_lc = ?"], (canon.lower(),),
+                                       limit=limit, allowed_colors=allowed, legal=legal, sort=sort)
+            return res
+        return _substr_cards("name", query_lower,
+                             limit=limit, allowed_colors=allowed, legal=legal, sort=sort)
     results = []
     for card in state.CARDS:
         name = card.get("name", "").lower()
@@ -157,31 +171,35 @@ def search_name(query, exact=False):
             for card in state.CARDS:
                 if card.get("name", "").lower() == canon.lower():
                     results.append(card)
-    return results
+    return _legacy_finish(results, limit=limit, commander=commander, legal=legal, sort=sort)
 
-def search_text(query):
+def search_text(query, limit=None, commander=None, legal=None, sort=None):
     query_lower = query.lower()
     if state.DB_MODE:
-        return _hydrate(_substr_rows("oracle_text", query_lower))
+        allowed = _resolve_commander_identity(commander) if commander else None
+        return _substr_cards("oracle_text", query_lower,
+                             limit=limit, allowed_colors=allowed, legal=legal, sort=sort)
     results = []
     for card in state.CARDS:
         oracle = card.get("oracle_text", "").lower()
         if query_lower in oracle:
             results.append(card)
-    return results
+    return _legacy_finish(results, limit=limit, commander=commander, legal=legal, sort=sort)
 
-def search_type(query):
+def search_type(query, limit=None, commander=None, legal=None, sort=None):
     query_lower = query.lower()
     if state.DB_MODE:
-        return _hydrate(_substr_rows("type_line", query_lower))
+        allowed = _resolve_commander_identity(commander) if commander else None
+        return _substr_cards("type_line", query_lower,
+                             limit=limit, allowed_colors=allowed, legal=legal, sort=sort)
     results = []
     for card in state.CARDS:
         type_line = card.get("type_line", "").lower()
         if query_lower in type_line:
             results.append(card)
-    return results
+    return _legacy_finish(results, limit=limit, commander=commander, legal=legal, sort=sort)
 
-def search_color(colors):
+def search_color(colors, limit=None, commander=None, legal=None, sort=None):
     """Search by colour identity. Accepts any combination of WUBRG letters.
 
     Raises ValueError on characters outside WUBRG so the caller can report
@@ -195,22 +213,22 @@ def search_color(colors):
             "Use only W, U, B, R, G (e.g. WG, BGR)."
         )
     if state.DB_MODE:
-        # NB: use `rid IN (...)` subqueries, not a self-join. A self-join on
-        # colors measured 4.9 s here; this form runs in ~11 ms.
+        allowed = _resolve_commander_identity(commander) if commander else None
         if not colors_upper:
             # Empty set is a subset of every colour identity (legacy semantics).
-            return _hydrate(state.DB.execute("SELECT data FROM cards ORDER BY rid").fetchall())
-        subs = " AND ".join(["rid IN (SELECT rid FROM colors WHERE color = ?)"] * len(colors_upper))
-        sql = "SELECT data FROM cards WHERE %s ORDER BY rid" % subs
-        return _hydrate(state.DB.execute(sql, tuple(sorted(colors_upper))).fetchall())
+            return _query_cards("cards c", [], (),
+                                limit=limit, allowed_colors=allowed, legal=legal, sort=sort)
+        subs = ["c.rid IN (SELECT rid FROM colors WHERE color = ?)"] * len(colors_upper)
+        return _query_cards("cards c", subs, tuple(sorted(colors_upper)),
+                            limit=limit, allowed_colors=allowed, legal=legal, sort=sort)
     results = []
     for card in state.CARDS:
         card_colors = set(card.get("color_identity", []))
         if colors_upper.issubset(card_colors):
             results.append(card)
-    return results
+    return _legacy_finish(results, limit=limit, commander=commander, legal=legal, sort=sort)
 
-def search_cmc(expr):
+def search_cmc(expr, limit=None, commander=None, legal=None, sort=None):
     """Search by CMC. Supports: =3, <=3, >=3, or just a number.
 
     Raises ValueError on an unparseable expression so the caller can report
@@ -239,50 +257,45 @@ def search_cmc(expr):
         raise ValueError(f"mana value cannot be negative: {val}")
 
     if state.DB_MODE:
-        # Every cached row has a numeric cmc, so the .get() defaults below
-        # never fire on real data; SQL's NULL handling matches for that reason.
+        allowed = _resolve_commander_identity(commander) if commander else None
         col_op = {"<=": "<=", ">=": ">=", "=": "="}[op]
-        sql = "SELECT data FROM cards WHERE cmc %s ? ORDER BY rid" % col_op
-        return _hydrate(state.DB.execute(sql, (val,)).fetchall())
+        return _query_cards("cards c", [f"c.cmc {col_op} ?"], (val,),
+                            limit=limit, allowed_colors=allowed, legal=legal, sort=sort)
 
     if op == "<=":
-        return [c for c in state.CARDS if c.get("cmc", 99) <= val]
+        results = [c for c in state.CARDS if c.get("cmc", 99) <= val]
     elif op == ">=":
-        return [c for c in state.CARDS if c.get("cmc", 0) >= val]
+        results = [c for c in state.CARDS if c.get("cmc", 0) >= val]
     else:
-        return [c for c in state.CARDS if c.get("cmc", -1) == val]
+        results = [c for c in state.CARDS if c.get("cmc", -1) == val]
+    return _legacy_finish(results, limit=limit, commander=commander, legal=legal, sort=sort)
 
-def search_keyword(query):
+def search_keyword(query, limit=None, commander=None, legal=None, sort=None):
     query_lower = query.lower()
     if state.DB_MODE:
-        # keywords are deliberately NOT in cards_ft: search_general's legacy
-        # scope is name/oracle/type only, and indexing keywords made the FTS
-        # MATCH pull in cards the old scan never returned (25 extra for
-        # "treasure"). Match them from the JSON payload instead — substring
-        # semantics per keyword element, same as the loop below.
-        rows = state.DB.execute(
-            "SELECT data FROM cards WHERE EXISTS ("
-            "SELECT 1 FROM json_each(cards.data, '$.keywords') j"
-            " WHERE lower(j.value) LIKE ? ESCAPE '\\') ORDER BY rid",
-            (_like_pattern(query_lower),)).fetchall()
-        return _hydrate(rows)
+        allowed = _resolve_commander_identity(commander) if commander else None
+        clause = ("EXISTS (SELECT 1 FROM json_each(c.data, '$.keywords') j"
+                  " WHERE lower(j.value) LIKE ? ESCAPE '\\')")
+        return _query_cards("cards c", [clause], (_like_pattern(query_lower),),
+                            limit=limit, allowed_colors=allowed, legal=legal, sort=sort)
     results = []
     for card in state.CARDS:
         keywords = [k.lower() for k in card.get("keywords", [])]
         if any(query_lower in k for k in keywords):
             results.append(card)
-    return results
+    return _legacy_finish(results, limit=limit, commander=commander, legal=legal, sort=sort)
 
-def search_general(query):
+def search_general(query, limit=None, commander=None, legal=None, sort=None):
     """Search across name, oracle text, and type line."""
     query_lower = query.lower()
     if state.DB_MODE:
-        res = _hydrate(_any_substr_rows(query_lower))
+        allowed = _resolve_commander_identity(commander) if commander else None
+        res = _any_substr_cards(query_lower, limit=limit, allowed_colors=allowed, legal=legal, sort=sort)
         if not res:
             from . import aliases
             canon = aliases.resolve_alias(query)
             if canon:
-                return _hydrate(_any_substr_rows(canon.lower()))
+                return _any_substr_cards(canon.lower(), limit=limit, allowed_colors=allowed, legal=legal, sort=sort)
         return res
     results = []
     seen = set()
@@ -311,13 +324,29 @@ def search_general(query):
                 if canon_lower in name or canon_lower in oracle or canon_lower in type_line:
                     results.append(card)
                     seen.add(card_id)
-    return results
+    return _legacy_finish(results, limit=limit, commander=commander, legal=legal, sort=sort)
 
-def search_random():
+def search_random(commander=None, legal=None):
     if state.DB_MODE:
-        row = state.DB.execute("SELECT data FROM cards ORDER BY RANDOM() LIMIT 1").fetchone()
-        return _hydrate([row]) if row else []
-    return [rng.choice(state.CARDS)]
+        allowed = _resolve_commander_identity(commander) if commander else None
+        where_parts = []
+        params = []
+        l_clause, l_params = _legal_clause(legal)
+        if l_clause:
+            where_parts.append(l_clause)
+            params.extend(l_params)
+        c_clause, c_params = _commander_clause(allowed)
+        if c_clause:
+            where_parts.append(c_clause)
+            params.extend(c_params)
+        where_sql = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
+        sql = f"SELECT c.data FROM cards c{where_sql} ORDER BY RANDOM() LIMIT 1"
+        row = state.DB.execute(sql, params).fetchone()
+        return SearchResult(_hydrate([row]) if row else [], total=1 if row else 0)
+    cards = state.CARDS
+    if commander or legal:
+        cards = apply_filters(cards, commander=commander, legal=legal)
+    return SearchResult([rng.choice(cards)] if cards else [], total=1 if cards else 0)
 
 # ── Apply filters ───────────────────────────────────────────────────────
 def _resolve_commander_identity(commander):

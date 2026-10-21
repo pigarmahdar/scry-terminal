@@ -23,6 +23,8 @@ Commands:
   image <name>        Download PNG image of a card (to Desktop by default)
   deck <file>         Analyze a decklist (mana curve, colors, engines, format audit)
   update              Update the Oracle cache from Scryfall
+  completion <shell>  Generate shell completion script (bash, zsh, fish)
+  version             Show version
   help                Show this help message and exit
 
 Options:
@@ -38,6 +40,7 @@ Options:
                       Default is auto-detected: pretty on a terminal, jsonl when
                       piped or redirected. Env override: SCRY_FORMAT=<fmt>.
                       NO_COLOR=1 strips ANSI styling from pretty output.
+  --version, -v       Show version and exit
   --help, -h          Show this help message and exit
 
 Machine-readable output (json/jsonl/csv/tsv):
@@ -76,7 +79,7 @@ import json
 import os
 import sys
 
-from . import state
+from . import __version__, state
 from .api import SCRYFALL_API, handle_fuzzy  # noqa: F401
 from .display import (
     display_card,
@@ -87,7 +90,6 @@ from .display import (
 )
 from .project import emit_records, emit_single, slim_card, text_card  # noqa: F401
 from .search import (
-    apply_filters,
     search_cmc,
     search_color,
     search_general,
@@ -97,7 +99,6 @@ from .search import (
     search_random,
     search_text,
     search_type,
-    sort_results,
 )
 from .state import (
     DB_PATH,
@@ -126,7 +127,7 @@ def parse_args(args):
     query_parts = []
     options = {"limit": 10, "commander": None, "legal": None, "exact": False, "sort": None,
                "size": None, "out": None, "border": None, "format": None, "commander_card": None,
-               "help": False}
+               "help": False, "version": False}
 
     i = 0
     while i < len(args):
@@ -186,6 +187,9 @@ def parse_args(args):
         elif arg == "--offline":
             options["offline"] = True
             i += 1
+        elif arg in ("--version", "-v", "-V"):
+            options["version"] = True
+            i += 1
         elif arg in ("--help", "-h"):
             options["help"] = True
             i += 1
@@ -213,7 +217,16 @@ def handle_update():
     cache_dir = os.path.dirname(ORACLE_PATH)
     os.makedirs(cache_dir, exist_ok=True)
 
+    try:
+        _, _, free = shutil.disk_usage(cache_dir)
+        free_mb = free / (1024 * 1024)
+        if free_mb < 350:
+            warn(f"Warning: Low disk space ({free_mb:.0f} MB available). Cache setup requires ~350 MB.")
+    except Exception:
+        pass
+
     gz_path = ORACLE_PATH + ".gz"
+    gz_part = gz_path + ".part"
     backup_path = ORACLE_PATH + ".backup"
 
     # 1. Get the download URL
@@ -247,9 +260,23 @@ def handle_update():
             headers={"User-Agent": "scry-terminal/1.0"},
         )
         with urllib.request.urlopen(req, timeout=300) as resp:
-            with open(gz_path, "wb") as f:
+            with open(gz_part, "wb") as f:
                 shutil.copyfileobj(resp, f)
+        os.replace(gz_part, gz_path)
+    except KeyboardInterrupt:
+        if os.path.exists(gz_part):
+            try:
+                os.remove(gz_part)
+            except OSError:
+                pass
+        print("\n\n  Download cancelled.", file=sys.stderr)
+        sys.exit(0)
     except Exception as e:
+        if os.path.exists(gz_part):
+            try:
+                os.remove(gz_part)
+            except OSError:
+                pass
         warn('✗ Download failed: ' + str(e))
         sys.exit(1)
 
@@ -346,7 +373,8 @@ def handle_deck(query, options):
         display_deck_analysis(res)
 
 VALID_COMMANDS = {"name", "text", "type", "color", "cmc", "keyword", "fuzzy", "random",
-                  "search", "price", "image", "update", "reindex", "doctor", "oracle", "mcp", "deck"}
+                  "search", "price", "image", "update", "reindex", "doctor", "oracle", "mcp", "deck",
+                  "completion", "version"}
 
 # ── Index maintenance commands (Option C) ───────────────────────────────
 def handle_reindex():
@@ -485,6 +513,20 @@ def main():
     state.MODE = resolve_format(options.get("format"))
     state.USE_COLOR = _colors_enabled(state.MODE)
 
+    # Version
+    if options.get("version") or command == "version":
+        if machine_mode():
+            emit_single({"version": __version__})
+        else:
+            print(f"scry {__version__}")
+        return
+
+    # Shell completion
+    if command == "completion":
+        from .completion import handle_completion
+        handle_completion(query)
+        return
+
     # Handle update command (doesn't need card data)
     if command == "update":
         handle_update()
@@ -517,13 +559,36 @@ def main():
 
     # Validate command (#4)
     if command and command not in VALID_COMMANDS:
+        import difflib
+        matches = difflib.get_close_matches(command, list(VALID_COMMANDS), n=1, cutoff=0.55)
+        suggestion = matches[0] if matches else None
+        full_query = (f"{command} {query}").strip()
+        visible_commands = sorted(VALID_COMMANDS - {"update", "mcp", "completion", "version"})
+
+        search_hint = f'scry search "{full_query}"'
+        name_hint = f'scry name "{full_query}"'
+
         if machine_mode():
-            emit_single({"error": "unknown_command", "command": command,
-                         "valid_commands": sorted(VALID_COMMANDS - {"update", "mcp"})})
+            payload = {
+                "error": "unknown_command",
+                "command": command,
+                "valid_commands": visible_commands,
+            }
+            if suggestion:
+                payload["suggestion"] = suggestion
+            else:
+                payload["suggestions"] = [search_hint, name_hint]
+            emit_single(payload)
         else:
             print("\n  " + c(fmt("✗ Unknown command '{}'.", command), '1;31'))
-            print(f"  Valid commands: {', '.join(sorted(VALID_COMMANDS - {'update', 'mcp'}))}")
-            print(f"  Use 'scry search \"{command} {query}\"' for a general search.\n")
+            if suggestion:
+                suggested_cmd = f"scry {suggestion}" + (f" \"{query}\"" if query else "")
+                print(f"  Did you mean: {c(suggested_cmd, '1;32')}?")
+            else:
+                print("  Did you mean:")
+                print(f"    {c(search_hint, '1;32')}  (search card text, name & types)")
+                print(f"    {c(name_hint, '1;32')}    (search card name)")
+            print(f"  Valid commands: {', '.join(visible_commands)}\n")
         sys.exit(1)
 
     # Guard empty queries (#1) — except random which needs no query
@@ -538,20 +603,42 @@ def main():
     # Load cards
     load_cards()
 
+    # Validate commander if specified
+    if options["commander"]:
+        try:
+            from .search import _resolve_commander_identity
+            _resolve_commander_identity(options["commander"])
+        except ValueError as e:
+            if machine_mode():
+                emit_single({"error": "invalid_commander", "details": str(e)})
+            else:
+                print("\n  " + c(fmt("✗ Invalid commander: {}", e), '1;31'))
+                print("  Usage: --commander WG | --commander 'Kwain, Itinerant Meddler'\n")
+            sys.exit(1)
+
+    limit = options["limit"]
+    commander = options["commander"]
+    legal = options["legal"]
+    sort = options["sort"]
+    if command == "price" and not sort:
+        sort = "price"
+        options["sort"] = "price"
+
     # Run search
     results = []
     if command == "name":
-        results = search_name(query, exact=options["exact"])
+        results = search_name(query, exact=options["exact"], limit=limit,
+                              commander=commander, legal=legal, sort=sort)
     elif command == "fuzzy":
         handle_fuzzy(query, options)
         return
     elif command == "text":
-        results = search_text(query)
+        results = search_text(query, limit=limit, commander=commander, legal=legal, sort=sort)
     elif command == "type":
-        results = search_type(query)
+        results = search_type(query, limit=limit, commander=commander, legal=legal, sort=sort)
     elif command == "color":
         try:
-            results = search_color(query)
+            results = search_color(query, limit=limit, commander=commander, legal=legal, sort=sort)
         except ValueError as e:
             if machine_mode():
                 emit_single({"error": "invalid_color", "query": query, "details": str(e)})
@@ -561,7 +648,7 @@ def main():
             sys.exit(1)
     elif command == "cmc":
         try:
-            results = search_cmc(query)
+            results = search_cmc(query, limit=limit, commander=commander, legal=legal, sort=sort)
         except ValueError as e:
             if machine_mode():
                 emit_single({"error": "invalid_cmc", "query": query, "details": str(e)})
@@ -570,21 +657,19 @@ def main():
                 print("  Usage: scry cmc 3 | scry cmc <=3 | scry cmc >=3\n")
             sys.exit(1)
     elif command == "keyword":
-        results = search_keyword(query)
+        results = search_keyword(query, limit=limit, commander=commander, legal=legal, sort=sort)
     elif command == "oracle":
         # Own shape (records + printing counts, text-only projection), so it
         # bypasses the shared filter/sort/emit block below.
         _handle_oracle(query, options)
         return
     elif command == "random":
-        results = search_random()
+        results = search_random(commander=commander, legal=legal)
     elif command == "search":
-        results = search_general(query)
+        results = search_general(query, limit=limit, commander=commander, legal=legal, sort=sort)
     elif command == "price":
-        results = search_name(query, exact=options["exact"])
-        # Default to price-sorted (most expensive first) when no sort specified
-        if not options["sort"]:
-            options["sort"] = "price"
+        results = search_name(query, exact=options["exact"], limit=limit,
+                              commander=commander, legal=legal, sort=sort)
         if machine_mode():
             # Numeric prices for clean comparisons; keep every field from the projector
             for r in results:
@@ -595,30 +680,14 @@ def main():
                     except (TypeError, ValueError):
                         p[k] = None
 
-    # Apply filters
-    try:
-        results = apply_filters(results, commander=options["commander"], legal=options["legal"])
-    except ValueError as e:
-        if machine_mode():
-            emit_single({"error": "invalid_commander", "details": str(e)})
-        else:
-            print("\n  " + c(fmt("✗ Invalid commander: {}", e), '1;31'))
-            print("  Usage: --commander WG | --commander 'Kwain, Itinerant Meddler'\n")
-        sys.exit(1)
-
-    # Apply sort (#5)
-    if options["sort"]:
-        results = sort_results(results, options["sort"])
-
-    limit = options["limit"]
-    total = len(results)
-    shown = min(limit, total)
+    total = getattr(results, "total", len(results))
+    shown = len(results)
 
     # ── Machine-readable output: stdout is pure data, meta goes to stderr ──
     if machine_mode():
         if total > shown:
             warn(f"{shown} of {total} matches shown (use --limit {total} for all)")
-        emit_records(results[:shown])
+        emit_records(results)
         return
 
     # Display

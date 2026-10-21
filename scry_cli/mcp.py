@@ -15,7 +15,6 @@ from . import state
 from .api import resolve_fuzzy
 from .project import slim_card, text_card
 from .search import (
-    apply_filters,
     search_cmc,
     search_color,
     search_general,
@@ -23,7 +22,6 @@ from .search import (
     search_name,
     search_oracle,
     search_text,
-    sort_results,
 )
 from .store import DB_PATH, ORACLE_PATH, SCHEMA_VERSION, db_status, load_cards
 
@@ -227,28 +225,27 @@ def _tool_search(args: dict[str, Any]) -> str:
 
     load_cards()
 
+    if commander:
+        from .search import _resolve_commander_identity
+        _resolve_commander_identity(commander)
+
     if search_type == "name":
-        results = search_name(query)
+        results = search_name(query, limit=limit, commander=commander, legal=legal, sort=sort_field)
     elif search_type == "text":
-        results = search_text(query)
+        results = search_text(query, limit=limit, commander=commander, legal=legal, sort=sort_field)
     elif search_type == "type":
-        results = search_type(query)
+        results = search_type(query, limit=limit, commander=commander, legal=legal, sort=sort_field)
     elif search_type == "color":
-        results = search_color(query)
+        results = search_color(query, limit=limit, commander=commander, legal=legal, sort=sort_field)
     elif search_type == "cmc":
-        results = search_cmc(query)
+        results = search_cmc(query, limit=limit, commander=commander, legal=legal, sort=sort_field)
     elif search_type == "keyword":
-        results = search_keyword(query)
+        results = search_keyword(query, limit=limit, commander=commander, legal=legal, sort=sort_field)
     else:
-        results = search_general(query)
+        results = search_general(query, limit=limit, commander=commander, legal=legal, sort=sort_field)
 
-    filtered = apply_filters(results, commander=commander, legal=legal)
-    if sort_field:
-        filtered = sort_results(filtered, sort_field)
-
-    total = len(filtered)
-    shown = filtered[:limit] if limit else filtered
-    cards = [slim_card(c) for c in shown]
+    total = getattr(results, "total", len(results))
+    cards = [slim_card(c) for c in results]
 
     payload = {
         "query": query,
@@ -283,13 +280,12 @@ def _tool_price(args: dict[str, Any]) -> str:
     limit = int(args.get("limit", 5))
 
     load_cards()
-    results = search_name(name)
-    sorted_cards = sort_results(results, "price")
-    cards = [slim_card(c) for c in sorted_cards[:limit]]
+    results = search_name(name, limit=limit, sort="price")
+    cards = [slim_card(c) for c in results]
 
     payload = {
         "query": name,
-        "total_matches": len(results),
+        "total_matches": getattr(results, "total", len(results)),
         "cards": cards,
     }
     return json.dumps(payload, indent=2)
