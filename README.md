@@ -307,4 +307,4 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-*Built as part of [Kwain.gg](https://kwain.gg/) — a project about generosity, attention, and play.*
+*Built as part of grouphug.gg — a project about generosity, attention, and play.*
