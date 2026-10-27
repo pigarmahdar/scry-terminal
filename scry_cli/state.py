@@ -64,6 +64,13 @@ def _colors_enabled(fmt):
         return False
     if os.environ.get("TERM", "").lower() == "dumb":
         return False
+    # Piping --pretty to a file or another program must never emit escapes.
+    # CI and `| cat` have no tty, where raw ANSI would corrupt the output.
+    try:
+        if not sys.stdout.isatty():
+            return False
+    except Exception:
+        return False
     return True
 
 USE_COLOR = True  # recomputed in main() after format resolution

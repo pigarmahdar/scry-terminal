@@ -81,9 +81,12 @@ CASES = [
 
 # Cases whose ENTIRE output is structural: no card data, no prices, no counts.
 # These are compared byte-for-byte in every lane. Everything else carries data.
+# NOTE: name-pretty is NOT here despite printing to a tty-like mode — it renders
+# card data (prices, results) and so differs by cache. Only pure error/help
+# paths qualify.
 STRUCTURAL_CASES = frozenset({
     "help", "cmc-bad", "color-bad", "unknown-cmd", "empty-query",
-    "unknown-flag", "name-pretty",
+    "unknown-flag",
 })
 
 # --- Lane B: tokens scrubbed before comparing data-bearing output -------------
@@ -100,9 +103,11 @@ def _pad(width_token):
 
 
 SCRUB = [
-    # prices: "usd": 1.96 -> "usd": <P>
-    (re.compile(r'"(usd|usd_foil|usd_etched|eur|eur_foil|tix)":\s*(?:"[^"]*"|[0-9.]+|null)'),
-     r'"\1": <P>'),
+    # The whole prices object collapses to one placeholder. Which keys exist
+    # depends on the cache: CI's freshly-fetched data has "prices": {} for the
+    # same card that a local cache reports usd/eur/tix for. Scrubbing keys
+    # individually would still fail on that key-set difference.
+    (re.compile(r'"prices":\s*\{[^{}]*\}'), '"prices": <PRICES>'),
     # cache / index sizes: "199.2 MB" -> "<SIZE>"
     (re.compile(r"\b\d+(?:\.\d+)? MB\b"), "<SIZE>"),
     # row counts: "38,940 vs 38,940 jsonl lines" -> "<N> vs <N> jsonl lines"
@@ -113,6 +118,9 @@ SCRUB = [
     # 3.12 -> 3.50.4) and again inside a PyInstaller bundle. Capability, not
     # version, is what doctor's `fts5 + trigram` line already proves.
     (re.compile(r"available \(\d+\.\d+[\.\d]*\)"), "available (<SQLITE>)"),
+    # doctor prints absolute paths under $HOME, which differs per machine
+    # (/Users/... vs /home/runner). The structure around them is still checked.
+    (re.compile(r"\S*/\.hermes/scryfall/\S*"), "<CACHE>/oracle")
 ]
 
 # The shown-count ("5 of 3926") keeps its limit but loses its total: the limit
@@ -235,7 +243,12 @@ def run_all():
 
 
 def compare(lane, want, got):
-    """Return (passed, failed) lists of (case/channel, message)."""
+    """Return (passed, failed) lists of (case/channel, message).
+
+    Requires a card cache: even validation errors (cmc-bad, color-bad) resolve
+    the cache before validating, so every case except the pure-help paths needs
+    data. CI caches ~/.hermes/scryfall for exactly this reason.
+    """
     passed, failed = [], []
     for label, base in want.items():
         cur = got.get(label)

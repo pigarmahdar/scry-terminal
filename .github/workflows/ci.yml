@@ -67,11 +67,20 @@ jobs:
           fi
           ./scry reindex || true
           ./scry doctor
+          # The gates below compare real card output; fail loudly rather than
+          # reporting 17 unrelated diffs if the cache is somehow absent.
+          test -f "$HOME/.hermes/scryfall/oracle-cards.jsonl" || { echo "card cache missing"; exit 1; }
 
       - name: Gate 1 - parity (SQLite path vs JSONL path)
         run: python tests/parity.py
 
       - name: Gate 2 - golden output (structural / volatile / stable lanes)
+        # The gate compares against a baseline recorded on macOS. NO_COLOR and
+        # TERM=dumb pin colour handling so a runner's tty-ish env cannot leak
+        # ANSI codes into byte comparisons.
+        env:
+          NO_COLOR: "1"
+          TERM: dumb
         run: python tests/cli_golden.py
 
   package:

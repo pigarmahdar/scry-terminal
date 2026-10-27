@@ -12,6 +12,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 
+# These tests exercise real tool behaviour, so they need card data. Point the
+# cache at a small committed fixture BEFORE importing scry_cli: state.py reads
+# SCRY_ORACLE_PATH at import and store.py binds it by value, so setting it
+# later has no effect. Without this, CI (which has no ~/.hermes cache) failed
+# all seven tool-call tests while a developer machine with a cache passed.
+os.environ["SCRY_ORACLE_PATH"] = os.path.join(HERE, "fixtures", "oracle_min.jsonl")
+os.environ.setdefault("SCRY_DB_PATH", os.path.join(HERE, "fixtures", "oracle_min.db"))
+
 from scry_cli import mcp  # noqa: E402
 
 
