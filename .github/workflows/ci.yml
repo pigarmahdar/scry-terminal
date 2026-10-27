@@ -35,7 +35,44 @@ jobs:
           pip install pytest
           pip install -e .
       - name: Run unit test suite
-        run: pytest tests/test_deck.py
+        run: pytest tests/
+
+  quality-gates:
+    # parity.py and cli_golden.py are __main__ scripts, NOT pytest tests, so
+    # `pytest tests/` cannot see them. They were never run in CI before this job
+    # existed. Both are the project's strongest regression nets; run them.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache the Scryfall oracle dataset
+        # Both gates need a real card cache. Building it once per run (~200 MB)
+        # is far cheaper than letting it be absent, which would make the gates
+        # silently vacuous ("both empty") instead of meaningful.
+        uses: actions/cache@v4
+        with:
+          path: ~/.hermes/scryfall
+          key: scryfall-oracle-${{ hashFiles('scry_cli/store.py') }}
+          restore-keys: scryfall-oracle-
+
+      - name: Fetch card data (first run only) + build index
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          if [ ! -f "$HOME/.hermes/scryfall/oracle-cards.jsonl" ]; then
+            ./scry update
+          fi
+          ./scry reindex || true
+          ./scry doctor
+
+      - name: Gate 1 - parity (SQLite path vs JSONL path)
+        run: python tests/parity.py
+
+      - name: Gate 2 - golden output (structural / volatile / stable lanes)
+        run: python tests/cli_golden.py
 
   package:
     runs-on: ubuntu-latest
