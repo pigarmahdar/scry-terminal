@@ -133,6 +133,14 @@ LIMIT_HINT_RE = re.compile(r"--limit\s+\d+")
 # intact so a broken image URL is still caught; only the stamp is scrubbed.
 IMG_STAMP_RE = re.compile(r'(cards\.scryfall\.io/[^\s"?]+)\?\d+')
 
+# A card name can have several printings (Sol Ring is in frc/21 AND trc/499).
+# Which one a cache resolves to depends on the dataset snapshot, not on scry,
+# so the printing-identifying parts are normalised: the set/number/name path
+# segments and the image's print UUID. The URL SHAPE and the card name are
+# still compared, so a broken link or wrong card is still caught.
+IMG_PRINT_RE = re.compile(r"(cards\.scryfall\.io/[a-z]+/front/)\w/\w/[\w-]{36}")
+CARD_URL_RE = re.compile(r"(scryfall\.com/card/)[^/\s\"]+/[^/\s\"]+/[^?\s\"]+")
+
 
 def scrub_csv(text):
     """Blank price cells in CSV output by column position.
@@ -184,6 +192,8 @@ def scrub(text):
     text = MATCH_RE.sub(r"\1 of <N> matches shown", text)
     text = LIMIT_HINT_RE.sub("--limit <N>", text)
     text = IMG_STAMP_RE.sub(r"\1?<STAMP>", text)
+    text = IMG_PRINT_RE.sub(r"\1<PRINT>", text)
+    text = CARD_URL_RE.sub(r"\1<SET>/<NUM>/<SLUG>", text)
     for pat, repl in SCRUB:
         if repl is None:
             # width-preserving: doctor aligns columns with spaces
