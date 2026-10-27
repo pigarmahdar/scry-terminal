@@ -90,16 +90,33 @@ jobs:
           du -sh dist/scry
           # Prove it runs standalone: empty env, minimal PATH.
           env -i PATH=/usr/bin:/bin HOME="$HOME" dist/scry/scry --help >/dev/null
-          env -i PATH=/usr/bin:/bin HOME="$HOME" dist/scry/scry oracle "Sol Ring" | head -c 200
+          env -i PATH=/usr/bin:/bin HOME="$HOME" dist/scry/scry version
+          # Data commands need a cache; use the committed fixture rather than
+          # pulling 200 MB in the release path.
+          FIX="$PWD/tests/fixtures/oracle_min.jsonl"
+          env -i PATH=/usr/bin:/bin HOME="$HOME" SCRY_ORACLE_PATH="$FIX" \
+            dist/scry/scry oracle "Sol Ring" | grep -q '"Sol Ring"'
           # Covers the aliases.json bundling regression that silently breaks
           # flavor-name resolution in frozen builds.
-          env -i PATH=/usr/bin:/bin HOME="$HOME" dist/scry/scry fuzzy "Master Emerald Shrine" \
-            | grep -q "Command Tower"
+          env -i PATH=/usr/bin:/bin HOME="$HOME" SCRY_ORACLE_PATH="$FIX" \
+            dist/scry/scry fuzzy "Master Emerald Shrine" | grep -q "Command Tower"
+          # MCP must speak over stdio.
+          echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+            | env -i PATH=/usr/bin:/bin HOME="$HOME" SCRY_ORACLE_PATH="$FIX" dist/scry/scry mcp \
+            | grep -q "scryfall_oracle"
           # Never ship the 200 MB cache or the DB inside the artifact.
           ! find dist/scry -name "*.jsonl" -o -name "*.db" | grep -q .
 
       - name: Golden suite against the frozen binary
-        run: SCRY_BIN=dist/scry/scry python tests/cli_golden.py
+        # SCRY_BIN is the whole point: prove the BUNDLE matches the source.
+        # Only the structural lane is meaningful here, because the baseline's
+        # data figures were recorded against a full cache, not this fixture.
+        env:
+          NO_COLOR: "1"
+          TERM: dumb
+          SCRY_BIN: ${{ github.workspace }}/dist/scry/scry
+          SCRY_ORACLE_PATH: ${{ github.workspace }}/tests/fixtures/oracle_min.jsonl
+        run: python tests/cli_golden.py --lane structural
 
       - name: Package
         run: tar -czf "${{ matrix.artifact }}.tar.gz" -C dist scry
