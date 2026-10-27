@@ -56,9 +56,13 @@ jobs:
 
   binaries:
     # M5: standalone `scry` bundles (no Python required) attached to the same
-    # release. Runs after publish so a broken PyPI upload never leaves binaries
-    # pointing at a version that did not ship.
+    # release. Ordered after publish so binaries never appear for a version
+    # that failed to ship — but not gated on it succeeding, because a re-run
+    # of an already-published version fails at the PyPI upload (that version
+    # exists) while the binaries are still worth building. A missing asset is
+    # harmless; a broken one is not, hence the smoke tests below.
     needs: publish
+    if: always() && needs.publish.result != 'cancelled'
     strategy:
       fail-fast: false
       matrix:
