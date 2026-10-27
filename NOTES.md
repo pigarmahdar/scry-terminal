@@ -12,6 +12,7 @@ This repository is linked with notes in the **[Bacon Notes](obsidian://open?vaul
 
 | Document | Category | Quick Link |
 | :--- | :--- | :--- |
+| `Scry Terminal - PRD.md` | 📝 Note | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Scry%20Terminal%20-%20PRD) |
 | `Scry Terminal — Progress Log and Roadmap.md` | 🗺️ Roadmap & Status | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Scry%20Terminal%20%E2%80%94%20Progress%20Log%20and%20Roadmap) |
 | `Sources.md` | 📚 Reference / Sources | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Sources) |
 
@@ -44,6 +45,14 @@ This repository is linked with notes in the **[Bacon Notes](obsidian://open?vaul
 | `01 Plan - Scryfall MCP.md` | 📋 Plan | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/MCP%20Server/01%20Plan%20-%20Scryfall%20MCP) |
 | `02 Walkthrough - Scryfall MCP.md` | 🚀 Walkthrough | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/MCP%20Server/02%20Walkthrough%20-%20Scryfall%20MCP) |
 | `03 Findings - MCP Troubleshooting.md` | 🔍 Findings & Investigation | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/MCP%20Server/03%20Findings%20-%20MCP%20Troubleshooting) |
+
+### Native Binary
+
+| Document | Category | Quick Link |
+| :--- | :--- | :--- |
+| `01 Plan - Native Binary Distribution.md` | 📋 Plan | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Native%20Binary/01%20Plan%20-%20Native%20Binary%20Distribution) |
+| `02 Walkthrough - Native Binary Distribution.md` | 🚀 Walkthrough | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Native%20Binary/02%20Walkthrough%20-%20Native%20Binary%20Distribution) |
+| `03 Walkthrough - M5 Release v1.1.0.md` | 🚀 Walkthrough | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Native%20Binary/03%20Walkthrough%20-%20M5%20Release%20v1.1.0) |
 
 ### Oracle Command
 
