@@ -53,3 +53,59 @@ jobs:
           files: dist/*
           generate_release_notes: true
           append_body: true
+
+  binaries:
+    # M5: standalone `scry` bundles (no Python required) attached to the same
+    # release. Runs after publish so a broken PyPI upload never leaves binaries
+    # pointing at a version that did not ship.
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # arm64 runner; do NOT use macos-latest, its arch can shift.
+          - { os: macos-14, artifact: scry-macos-arm64 }
+          # Built on ubuntu's current glibc; see "Linux glibc" note in the plan.
+          - { os: ubuntu-22.04, artifact: scry-linux-x86_64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the bundle
+        run: |
+          python -m pip install --upgrade pip
+          # Pinned: unpinned PyInstaller can change artefact behaviour silently.
+          pip install "pyinstaller==6.11.1"
+          pip install -e .
+          pyinstaller scry.spec --noconfirm
+
+      - name: Smoke-test the bundle (no Python on PATH)
+        run: |
+          set -e
+          ls -la dist/scry/scry
+          du -sh dist/scry
+          # Prove it runs standalone: empty env, minimal PATH.
+          env -i PATH=/usr/bin:/bin HOME="$HOME" dist/scry/scry --help >/dev/null
+          env -i PATH=/usr/bin:/bin HOME="$HOME" dist/scry/scry oracle "Sol Ring" | head -c 200
+          # Covers the aliases.json bundling regression that silently breaks
+          # flavor-name resolution in frozen builds.
+          env -i PATH=/usr/bin:/bin HOME="$HOME" dist/scry/scry fuzzy "Master Emerald Shrine" \
+            | grep -q "Command Tower"
+          # Never ship the 200 MB cache or the DB inside the artifact.
+          ! find dist/scry -name "*.jsonl" -o -name "*.db" | grep -q .
+
+      - name: Golden suite against the frozen binary
+        run: SCRY_BIN=dist/scry/scry python tests/cli_golden.py
+
+      - name: Package
+        run: tar -czf "${{ matrix.artifact }}.tar.gz" -C dist scry
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: "${{ matrix.artifact }}.tar.gz"
+          append_body: true
+

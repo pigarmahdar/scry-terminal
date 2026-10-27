@@ -38,6 +38,25 @@ class TestAliases(unittest.TestCase):
         self.assertIsNone(aliases.resolve_alias(""))
         self.assertIsNone(aliases.resolve_alias(None))
 
+    def test_bundled_data_dir_resolves_in_every_layout(self):
+        """Data dir must be found from a source tree AND from a frozen bundle.
+
+        Regression: joining sys._MEIPASS with only "data" resolved to
+        _internal/data (missing the scry_cli segment) in PyInstaller onedir
+        builds, so flavor names silently stopped resolving — the loader's
+        `except Exception: pass` hid it. Pins the shipped layout for each form.
+        """
+        real_fromfile = os.path.join(os.path.dirname(aliases.__file__), "data")
+        self.assertEqual(aliases._pick_data_dir([real_fromfile]), real_fromfile)
+
+        # No candidate exists -> falls back to the first (source) path.
+        self.assertEqual(aliases._pick_data_dir(["/nope/a", "/nope/b"]), "/nope/a")
+
+        # Frozen onedir/onefile only need the first existing candidate to win.
+        self.assertEqual(
+            aliases._pick_data_dir(["/nope/a", real_fromfile, "/nope/c"]), real_fromfile
+        )
+
     def test_user_override_precedence(self):
         with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json") as f:
             f.write('{"custom proxy": "Black Lotus", "master emerald shrine": "Custom Tower"}')

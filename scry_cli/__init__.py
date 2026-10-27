@@ -12,7 +12,13 @@ try:
     from importlib.metadata import version as _get_version
     __version__ = _get_version("scry-terminal")
 except Exception:
-    __version__ = "1.0.0"
+    # No package metadata (PyInstaller bundle, bare source checkout).
+    # scry.spec regenerates this file at build time, so a frozen binary still
+    # reports its real version instead of a stale literal.
+    try:
+        from ._buildinfo import VERSION as __version__
+    except Exception:
+        __version__ = "0+unknown"
 
 from .api import _resolve_card, scryfall_autocomplete, scryfall_fuzzy  # noqa: F401
 from .cli import VALID_COMMANDS, main, parse_args  # noqa: F401

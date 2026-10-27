@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scry-terminal"
-version = "1.0.0"
+version = "1.1.0"
 description = "Instant, offline Magic: The Gathering card lookups and deck diagnostics from your terminal."
 readme = "README.md"
 authors = [

@@ -13,10 +13,27 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from typing import Dict, Optional
 
-# Bundled data path
-_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
+# Bundled data path. Explore a candidate list rather than branching on build
+# layout: onedir keeps __file__ correct, while --onefile/module layouts shift it.
+# First directory that actually contains aliases.json wins.
+def _pick_data_dir(candidates):
+    """First candidate containing aliases.json, else the first candidate."""
+    for d in candidates:
+        if d and os.path.exists(os.path.join(d, "aliases.json")):
+            return d
+    return candidates[0]
+
+
+_CANDIDATE_DIRS = [
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"),
+    os.path.join(getattr(sys, "_MEIPASS", ""), "scry_cli", "data"),
+    os.path.join(getattr(sys, "_MEIPASS", ""), "data"),
+]
+_DATA_DIR = _pick_data_dir(_CANDIDATE_DIRS)
 _BUNDLED_ALIASES_PATH = os.path.join(_DATA_DIR, "aliases.json")
 
 # User override path in ~/.hermes/scryfall/aliases.json

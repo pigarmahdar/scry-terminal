@@ -11,6 +11,7 @@ import os
 import sys
 from typing import Any
 
+from . import __version__ as _scry_version
 from . import state
 from .api import resolve_fuzzy
 from .project import slim_card, text_card
@@ -27,7 +28,8 @@ from .store import DB_PATH, ORACLE_PATH, SCHEMA_VERSION, db_status, load_cards
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "scryfall-mcp"
-SERVER_VERSION = "1.0.0"
+# Derived, never hardcoded: a literal here drifts from pyproject on every bump.
+SERVER_VERSION = _scry_version
 
 # ── Tool Definitions ───────────────────────────────────────────────────
 

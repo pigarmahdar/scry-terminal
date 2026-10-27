@@ -50,6 +50,37 @@ scry update
 
 Both `scry` and `scryfall` (backwards-compatible alias) are placed on your PATH automatically.
 
+### Alternative: standalone binary (no Python required)
+
+Prebuilt bundles for **macOS (Apple Silicon)** and **Linux (x86_64)** are attached to each
+[GitHub Release](https://github.com/pigarmahdar/Scry-Terminal/releases) as `scry-macos-arm64.tar.gz`
+and `scry-linux-x86_64.tar.gz`.
+
+```shell
+# macOS (Apple Silicon)
+curl -L -o scry.tar.gz https://github.com/pigarmahdar/Scry-Terminal/releases/latest/download/scry-macos-arm64.tar.gz
+tar xzf scry.tar.gz && sudo mv scry /usr/local/
+sudo xattr -d com.apple.quarantine /usr/local/scry/scry   # see note below
+sudo ln -sf /usr/local/scry/scry /usr/local/bin/scry
+scry update
+```
+
+```shell
+# Linux (x86_64)
+curl -L -o scry.tar.gz https://github.com/pigarmahdar/Scry-Terminal/releases/latest/download/scry-linux-x86_64.tar.gz
+tar xzf scry.tar.gz && sudo mv scry /usr/local/
+sudo ln -sf /usr/local/scry/scry /usr/local/bin/scry
+scry update
+```
+
+> **macOS Gatekeeper note:** these binaries are **not code-signed or notarised** (that requires a
+> paid Apple Developer account). macOS attaches a quarantine flag to downloaded files and will refuse
+> to run them. The `xattr -d com.apple.quarantine` line above removes it — only do this for binaries
+> you got from this repository's official Releases page. If you'd rather not, use `pipx` instead.
+
+Windows, macOS Intel, and Linux ARM are not yet built. The bundle never contains the card cache;
+`scry update` downloads that separately to `~/.hermes/scryfall/`.
+
 ### Developer: git clone
 
 ```shell
@@ -62,8 +93,8 @@ scry update
 ### Packaging & Distribution Roadmap
 
 - **pip / pipx**: `pip install scry-terminal` ✅ (this release)
+- **Pre-compiled standalone binaries**: `scry-macos-arm64` / `scry-linux-x86_64` on GitHub Releases ✅ (no Python required)
 - **Homebrew tap** *(Planned)*: `brew tap pigarmahdar/tap && brew install scry`
-- **Pre-compiled standalone binaries** *(Planned)*: Self-contained single binaries distributed via GitHub Releases.
 
 > **Offline / Manual Cache Setup**: If you prefer not to use `scry update`, you can fetch the dataset directly:
 > ```shell
