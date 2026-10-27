@@ -46,6 +46,12 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # PyPI permanently rejects re-uploading an existing version (400 File
+          # already exists), which turned a re-tagged release into a red run
+          # even though every artifact had shipped. With this, a re-run of an
+          # already-published version is a clean no-op instead.
+          skip-existing: true
 
       - name: Create GitHub Release with artifacts
         uses: softprops/action-gh-release@v2
