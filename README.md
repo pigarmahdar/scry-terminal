@@ -135,7 +135,7 @@ Add it to your MCP client configuration (`claude_desktop_config.json`, Cursor, W
 ```
 
 - **Native MCP Tools**: `scryfall_oracle` (token-efficient rules text), `scryfall_search` (filtered card search), `scryfall_fuzzy` (typo resolution), `scryfall_deck` (4-pillar deck audit), `scryfall_price` (market prices), and `scryfall_doctor` (cache health).
-- **Agent Prompts**: Point your AI assistant at [AGENT.md](AGENT.md) for output contracts, schemas, and prompting rules to prevent LLM card hallucinations.
+- **Agent Prompts**: Point your AI assistant at [AGENT_PROMPT.md](AGENT_PROMPT.md) for output contracts, schemas, and prompting rules to prevent LLM card hallucinations.
 
 ## Command Reference
 
