@@ -33,6 +33,7 @@ def slim_card(card):
             return None
 
     return {
+        "version": 1,  # record-contract version; bumps only on a breaking change
         "name": card.get("name"),
         "lang": card.get("lang", "en"),
         "mana_cost": card.get("mana_cost", ""),

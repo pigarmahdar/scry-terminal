@@ -40,6 +40,7 @@ returns a deliberate subset — see its section below):
 
 | Field | Type | Notes |
 |---|---|---|
+| `version` | integer | Record contract version. Currently `1`. |
 | `name` | string | Canonical English card name |
 | `lang` | string | Print language; `"en"` unless noted |
 | `mana_cost` | string | e.g. `"{1}{U}"`; empty for some special cards |
@@ -57,6 +58,12 @@ returns a deliberate subset — see its section below):
 
 Special layouts (double-faced, transforms, tokens) expose the front face's image
 and oracle text.
+
+### Schema stability
+
+Fields may be added at any time; existing fields will never be removed, renamed,
+or change type. The `version` field (currently `1`) bumps only on a breaking
+change. When `version` changes, adapt your parser accordingly.
 
 ## Commands
 

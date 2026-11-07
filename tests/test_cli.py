@@ -62,6 +62,12 @@ class TestCLIHelp(unittest.TestCase):
 
 class TestCLIErgonomics(unittest.TestCase):
 
+    def test_machine_record_carries_contract_version(self):
+        """Every jsonl/json record is stamped with the frozen contract version."""
+        from scry_cli.project import slim_card
+        rec = slim_card({"name": "Sol Ring"})
+        self.assertEqual(rec["version"], 1)
+
     def test_version_flags_and_command(self):
         for flag in ["--version", "-v", "-V"]:
             with self.subTest(flag=flag):
