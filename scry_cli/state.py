@@ -20,6 +20,11 @@ DB_PATH = (
     or os.environ.get("SCRYFALL_DB_PATH")
     or os.path.expanduser("~/.hermes/scryfall/oracle-cards.db")
 )
+PRICE_DB_PATH = (
+    os.environ.get("SCRY_PRICE_DB_PATH")
+    or os.environ.get("SCRYFALL_PRICE_DB_PATH")
+    or os.path.join(os.path.dirname(ORACLE_PATH), "price-history.db")
+)
 SCHEMA_VERSION = "1"
 
 # ── Output mode (resolved once at startup in main()) ────────────────────

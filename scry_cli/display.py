@@ -6,9 +6,12 @@ All of these print() to stdout with ANSI styling gated by USE_COLOR (state.USE_C
 import os
 import re
 
+from . import state
 from .api import USER_AGENT, _api_get, _resolve_card
+from .chart import render_sparkline, render_trend_chart
 from .project import emit_single
 from .state import COLOUR_SYMBOLS, c, fmt, machine_mode, warn
+from .store import get_price_history
 
 
 # ── Display a single card ───────────────────────────────────────────────
@@ -142,6 +145,11 @@ def display_price_card(card, index=None):
     eur_foil = format_price(prices.get("eur_foil"), "€")
     tix = format_price(prices.get("tix"), "")
 
+    # Retrieve history for trend display
+    history = get_price_history(name.lower(), currency="usd", limit=30)
+    if usd == "—" and history:
+        usd = format_price(history[-1][1], "$")
+
     prefix = f"  [{index}] " if index is not None else "  "
     print('\n' + prefix + c(name, '1;33') + '  ' + mana + '  (CMC ' + str(cmc_display) + ')')
     print(f"       {type_line}  •  {colour_str}")
@@ -150,6 +158,12 @@ def display_price_card(card, index=None):
     usd_part = f"USD {usd}"
     if usd_foil != "—":
         usd_part += f" (foil {usd_foil})"
+
+    if history and len(history) > 1:
+        spark = render_sparkline([p for _, p in history])
+        if spark:
+            usd_part += f"  [{spark}]"
+
     eur_part = f"EUR {eur}"
     if eur_foil != "—":
         eur_part += f" (foil {eur_foil})"
@@ -157,6 +171,25 @@ def display_price_card(card, index=None):
 
     print('       ' + c(usd_part, '1;32') + '  •  ' + eur_part + '  •  ' + tix_part)
     print(f"       {card.get('scryfall_uri', '')}")
+
+    if history and len(history) > 1:
+        chart_str = render_trend_chart(
+            history,
+            title=f"{name} — 30-Day USD Trend",
+            currency="$",
+            use_color=state.USE_COLOR,
+        )
+        if chart_str:
+            print(f"\n{chart_str}")
+    elif history and len(history) == 1:
+        date_str = history[0][0]
+        try:
+            d_clean = date_str.replace("-", "")
+            if len(d_clean) == 8:
+                date_str = f"{d_clean[4:6]}/{d_clean[6:8]}"
+        except Exception:
+            pass
+        print(c(f"       Price Trend: 1 snapshot recorded ({date_str}: ${history[0][1]:.2f}) • Historical curve builds daily via 'scry update'", "2"))
 
 # ── Image download ──────────────────────────────────────────────────────
 def _safe_filename(name):

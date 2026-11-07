@@ -127,7 +127,7 @@ def parse_args(args):
     query_parts = []
     options = {"limit": 10, "commander": None, "legal": None, "exact": False, "sort": None,
                "size": None, "out": None, "border": None, "format": None, "commander_card": None,
-               "help": False, "version": False}
+               "prices": None, "help": False, "version": False}
 
     i = 0
     while i < len(args):
@@ -184,6 +184,12 @@ def parse_args(args):
             # Escape hatch: force the legacy JSONL scan path (debugging/parity).
             state.FORCE_NO_DB = True  # module attr: parse_args can't `global` across modules
             i += 1
+        elif arg in ("--prices", "-p"):
+            options["prices"] = True
+            i += 1
+        elif arg == "--no-prices":
+            options["prices"] = False
+            i += 1
         elif arg == "--offline":
             options["offline"] = True
             i += 1
@@ -208,12 +214,13 @@ def parse_args(args):
     return command, query, options
 
 # ── Update cache ─────────────────────────────────────────────────────
-def handle_update():
+def handle_update(options=None):
     """Download the latest Oracle Cards bulk data from Scryfall."""
     import gzip
     import shutil
     import time
     import urllib.request
+    from .store import record_daily_prices
     cache_dir = os.path.dirname(ORACLE_PATH)
     os.makedirs(cache_dir, exist_ok=True)
 
@@ -333,6 +340,30 @@ def handle_update():
     else:
         warn("sqlite3/FTS5 unavailable in this Python build;"
              " queries will use the JSONL scan path.")
+
+    # Price history update: opt-in interactive prompt or via --prices flag
+    if options is None:
+        options = {}
+    want_prices = options.get("prices")
+    if want_prices is None:
+        if sys.stdin.isatty():
+            try:
+                sys.stderr.write("  Update price history? [y/N]: ")
+                sys.stderr.flush()
+                ans = sys.stdin.readline().strip().lower()
+                want_prices = ans in ("y", "yes")
+            except (EOFError, KeyboardInterrupt):
+                want_prices = False
+        else:
+            want_prices = False
+
+    if want_prices:
+        warn("Recording price history snapshot...")
+        count = record_daily_prices(ORACLE_PATH)
+        print(f"    {c('✓ Recorded daily price snapshot', '1;32')} ({count:,} cards)\n", file=sys.stderr)
+    else:
+        # Background record quietly so history accumulates
+        record_daily_prices(ORACLE_PATH)
 
 def handle_deck(query, options):
     load_cards()
@@ -529,7 +560,7 @@ def main():
 
     # Handle update command (doesn't need card data)
     if command == "update":
-        handle_update()
+        handle_update(options)
         return
 
     # Index maintenance (doesn't need card data loaded)

@@ -394,3 +394,111 @@ def _any_substr_rows(query):
     """Legacy helper: rows matching `query` as raw tuples (kept for compatibility)."""
     res = _any_substr_cards(query)
     return [[json.dumps(c, ensure_ascii=False)] for c in res]
+
+
+# ── Price history time-series storage ────────────────────────────────────
+
+def get_price_history(name_lc: str, currency: str = "usd", limit: int = 30):
+    """Retrieve chronological price history for a card. Returns list of (date_str, price)."""
+    sq = _sqlite_module()
+    if sq is None or not os.path.exists(state.PRICE_DB_PATH):
+        return []
+    col = "usd"
+    curr = currency.lower().strip()
+    if curr in ("eur", "euro", "€"):
+        col = "eur"
+    elif curr in ("tix", "tickets"):
+        col = "tix"
+
+    try:
+        conn = sq.connect(state.PRICE_DB_PATH)
+        try:
+            cur = conn.cursor()
+            rows = cur.execute(
+                f"SELECT date, {col} FROM price_history WHERE name_lc = ? AND {col} IS NOT NULL ORDER BY date ASC LIMIT ?",
+                (name_lc.lower().strip(), limit)
+            ).fetchall()
+            out = []
+            for d, p in rows:
+                s_d = str(d)
+                if len(s_d) == 8:
+                    fmt_d = f"{s_d[:4]}-{s_d[4:6]}-{s_d[6:]}"
+                else:
+                    fmt_d = s_d
+                out.append((fmt_d, float(p)))
+            return out
+        finally:
+            conn.close()
+    except Exception:
+        return []
+
+
+def record_daily_prices(source=None, date_int=None):
+    """Record card prices into the price history database."""
+    sq = _sqlite_module()
+    if sq is None:
+        return 0
+    import datetime
+    if date_int is None:
+        date_int = int(datetime.datetime.now().strftime("%Y%m%d"))
+
+    cache_dir = os.path.dirname(state.PRICE_DB_PATH)
+    os.makedirs(cache_dir, exist_ok=True)
+
+    try:
+        conn = sq.connect(state.PRICE_DB_PATH)
+        try:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS price_history ("
+                "name_lc TEXT NOT NULL, date INTEGER NOT NULL, "
+                "usd REAL, eur REAL, tix REAL, PRIMARY KEY (name_lc, date))"
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_price_name_date ON price_history(name_lc, date)")
+
+            records = []
+            if source is None:
+                source = ORACLE_PATH
+
+            if isinstance(source, str) and os.path.exists(source):
+                with open(source, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            c = json.loads(line)
+                            name = c.get("name")
+                            if not name:
+                                continue
+                            p = c.get("prices") or {}
+                            usd = float(p["usd"]) if p.get("usd") is not None else None
+                            eur = float(p["eur"]) if p.get("eur") is not None else None
+                            tix = float(p["tix"]) if p.get("tix") is not None else None
+                            if usd is not None or eur is not None or tix is not None:
+                                records.append((name.lower().strip(), date_int, usd, eur, tix))
+                        except Exception:
+                            continue
+            elif hasattr(source, "__iter__"):
+                for c in source:
+                    name = c.get("name")
+                    if not name:
+                        continue
+                    p = c.get("prices") or {}
+                    usd = float(p["usd"]) if p.get("usd") is not None else None
+                    eur = float(p["eur"]) if p.get("eur") is not None else None
+                    tix = float(p["tix"]) if p.get("tix") is not None else None
+                    if usd is not None or eur is not None or tix is not None:
+                        records.append((name.lower().strip(), date_int, usd, eur, tix))
+
+            if records:
+                conn.executemany(
+                    "INSERT OR REPLACE INTO price_history(name_lc, date, usd, eur, tix) VALUES(?,?,?,?,?)",
+                    records
+                )
+                conn.commit()
+            return len(records)
+        finally:
+            conn.close()
+    except Exception as e:
+        warn(f"Failed to record daily prices: {e}")
+        return 0
