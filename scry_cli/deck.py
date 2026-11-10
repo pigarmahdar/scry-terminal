@@ -7,6 +7,7 @@ Pillar 4: Deck Heritage (Vintage spectrum: Classic Pre-2003, Modern Frame 2003-2
 
 Strictly offline-first: never makes HTTP requests to Scryfall API.
 """
+
 from __future__ import annotations
 
 import difflib
@@ -58,6 +59,7 @@ def clean_card_name(raw_name: str) -> str:
     if m_paren:
         p1, p2 = m_paren.group(1).strip(), m_paren.group(2).strip()
         from . import aliases
+
         if aliases.resolve_alias(p1):
             name = p1
         elif aliases.resolve_alias(p2):
@@ -114,17 +116,20 @@ def parse_decklist(text_or_lines: str | List[str]) -> List[Dict[str, Any]]:
         if not cleaned_name:
             continue
 
-        entries.append({
-            "count": count,
-            "name": cleaned_name,
-            "section": current_section,
-            "raw": line_clean,
-        })
+        entries.append(
+            {
+                "count": count,
+                "name": cleaned_name,
+                "section": current_section,
+                "raw": line_clean,
+            }
+        )
 
     return entries
 
 
 # ── Batch Offline Name Resolution ──────────────────────────────────────────
+
 
 def resolve_deck_cards(
     parsed_entries: List[Dict[str, Any]],
@@ -203,7 +208,9 @@ def resolve_deck_cards(
                         best_match = None
                         best_score = 0.0
                         for cand_name, cand_data in candidates:
-                            score = difflib.SequenceMatcher(None, target_un, cand_name.lower()).ratio()
+                            score = difflib.SequenceMatcher(
+                                None, target_un, cand_name.lower()
+                            ).ratio()
                             if score > best_score:
                                 best_score = score
                                 best_match = json.loads(cand_data)
@@ -223,10 +230,15 @@ def resolve_deck_cards(
     unmatched_after_offline = [n for n in distinct_names if n not in name_map]
     if unmatched_after_offline and not offline:
         from . import api
+
         for un in unmatched_after_offline:
             try:
                 api_card = api.scryfall_fuzzy(un)
-                if api_card and not api_card.get("error") and not isinstance(api_card.get("name"), list):
+                if (
+                    api_card
+                    and not api_card.get("error")
+                    and not isinstance(api_card.get("name"), list)
+                ):
                     c_name = api_card.get("name", "")
                     f_name = api_card.get("flavor_name", "")
                     p_name = api_card.get("printed_name", "")
@@ -235,7 +247,9 @@ def resolve_deck_cards(
                         candidates.append(f_name)
                     if p_name:
                         candidates.append(p_name)
-                    sim = max((api._similarity(un, cand) for cand in candidates if cand), default=0.0)
+                    sim = max(
+                        (api._similarity(un, cand) for cand in candidates if cand), default=0.0
+                    )
                     if sim >= 0.65 or (f_name and f_name.lower() == un.lower()):
                         local_card = None
                         if state.DB_MODE and state.DB is not None:
@@ -290,9 +304,15 @@ def resolve_deck_cards(
 # ── Pillar 1: Vitals & Mana Architecture ───────────────────────────────────
 
 _BASIC_LAND_COLORS = {
-    "plains": "W", "island": "U", "swamp": "B", "mountain": "R", "forest": "G",
-    "snow-covered plains": "W", "snow-covered island": "U",
-    "snow-covered swamp": "B", "snow-covered mountain": "R",
+    "plains": "W",
+    "island": "U",
+    "swamp": "B",
+    "mountain": "R",
+    "forest": "G",
+    "snow-covered plains": "W",
+    "snow-covered island": "U",
+    "snow-covered swamp": "B",
+    "snow-covered mountain": "R",
     "snow-covered forest": "G",
 }
 
@@ -376,14 +396,20 @@ def analyze_mana(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any]:
             is_creature = "Creature" in type_line
             is_spell = "Instant" in type_line or "Sorcery" in type_line
 
-            if is_artifact and ("add {" in oracle_text.lower() or "any color" in oracle_text.lower()):
+            if is_artifact and (
+                "add {" in oracle_text.lower() or "any color" in oracle_text.lower()
+            ):
                 ramp_count += count
                 for col in ("W", "U", "B", "R", "G"):
                     if f"{{{col}}}" in oracle_text or "any color" in oracle_text.lower():
                         mana_sources[col] += count
-            elif is_creature and ("{t}: add" in oracle_text.lower() or "add one mana" in oracle_text.lower()):
+            elif is_creature and (
+                "{t}: add" in oracle_text.lower() or "add one mana" in oracle_text.lower()
+            ):
                 ramp_count += count
-            elif is_spell and ("search your library for a" in oracle_text.lower() and "land" in oracle_text.lower()):
+            elif is_spell and (
+                "search your library for a" in oracle_text.lower() and "land" in oracle_text.lower()
+            ):
                 ramp_count += count
 
             # Pip demand from non-land mana costs
@@ -396,11 +422,11 @@ def analyze_mana(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any]:
                     parts = sym.split("/")
                     for p in parts:
                         if p in pip_demand:
-                            pip_demand[p] += (0.5 * count)
+                            pip_demand[p] += 0.5 * count
                             if p in color_pips_in_card:
                                 color_pips_in_card[p] += 1
                 elif sym in pip_demand:
-                    pip_demand[sym] += (1.0 * count)
+                    pip_demand[sym] += 1.0 * count
                     if sym in color_pips_in_card:
                         color_pips_in_card[sym] += 1
 
@@ -417,14 +443,16 @@ def analyze_mana(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any]:
             recommended = 23
         current = mana_sources.get(col, 0)
         if current < recommended:
-            early_hurdles.append({
-                "card": card.get("name"),
-                "cost": mana_cost,
-                "cmc": cmc,
-                "color": col,
-                "current_sources": current,
-                "recommended_sources": recommended,
-            })
+            early_hurdles.append(
+                {
+                    "card": card.get("name"),
+                    "cost": mana_cost,
+                    "cmc": cmc,
+                    "color": col,
+                    "current_sources": current,
+                    "recommended_sources": recommended,
+                }
+            )
 
     avg_cmc_nonlands = round(total_cmc / max(non_lands_count, 1), 2)
 
@@ -435,8 +463,12 @@ def analyze_mana(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any]:
     source_pct: Dict[str, float] = {}
 
     for c in ("W", "U", "B", "R", "G"):
-        pip_pct[c] = round((pip_demand[c] / colored_total_pips * 100), 1) if colored_total_pips > 0 else 0.0
-        source_pct[c] = round((mana_sources[c] / source_total * 100), 1) if source_total > 0 else 0.0
+        pip_pct[c] = (
+            round((pip_demand[c] / colored_total_pips * 100), 1) if colored_total_pips > 0 else 0.0
+        )
+        source_pct[c] = (
+            round((mana_sources[c] / source_total * 100), 1) if source_total > 0 else 0.0
+        )
 
     return {
         "lands_count": lands_count,
@@ -456,6 +488,7 @@ def analyze_mana(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 # ── Pillar 2: Table Dynamic & Political Posture ───────────────────────────
 
+
 def analyze_table_dynamic(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Classify non-land cards by grammatical targeting: Self-focused vs Targeted vs Symmetrical."""
     self_count = 0
@@ -463,14 +496,30 @@ def analyze_table_dynamic(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any
     symmetrical_count = 0
 
     symmetrical_patterns = (
-        "each player", "each opponent", "all players", "all creatures",
-        "all nonland", "all permanents", "each other player", "any player may",
-        "players can't", "each other creature",
+        "each player",
+        "each opponent",
+        "all players",
+        "all creatures",
+        "all nonland",
+        "all permanents",
+        "each other player",
+        "any player may",
+        "players can't",
+        "each other creature",
     )
     targeted_patterns = (
-        "target opponent", "target player", "target permanent", "target creature",
-        "target artifact", "target enchantment", "target spell", "target nonland",
-        "destroy target", "exile target", "deals damage to target", "counter target",
+        "target opponent",
+        "target player",
+        "target permanent",
+        "target creature",
+        "target artifact",
+        "target enchantment",
+        "target spell",
+        "target nonland",
+        "destroy target",
+        "exile target",
+        "deals damage to target",
+        "counter target",
     )
 
     total_non_land = 0
@@ -488,7 +537,8 @@ def analyze_table_dynamic(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any
         elif any(p in oracle for p in targeted_patterns):
             # Verify it's not just "target creature you control"
             if "target creature you control" in oracle and not any(
-                p in oracle for p in ("target spell", "target creature an opponent", "target opponent")
+                p in oracle
+                for p in ("target spell", "target creature an opponent", "target opponent")
             ):
                 self_count += count
             else:
@@ -521,28 +571,281 @@ def analyze_table_dynamic(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any
     }
 
 
+# ── F/S/S Affordance Architecture (Pillar 2 Expansion) ────────────────────
+
+_FSS_REMINDER_RE = re.compile(r"\([^)]*\)")
+
+_FOUNTAIN_PATTERNS = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\beach player draws?\b",
+        r"\ball players draw\b",
+        r"\beach player may draw\b",
+        r"\beach player.*draws? an additional card\b",
+        r"\beach player's draw step,.*that player draws\b",
+        r"\bparley\b",
+        r"\beach player.*additional land\b",
+        r"\beach player searches their library for.*land\b",
+        r"\bwhenever a player taps a land for mana, that player adds\b",
+        r"\beach player may pay any amount of mana\b",
+        r"\bjoin forces\b",
+        r"\beach player creates\b",
+        r"\beach player gains\b",
+        r"\beach player.*fewest creatures creates\b",
+        r"\btempt with\b",
+        r"\bfor each player, put a .* counter\b",
+        r"\bat the beginning of each player's upkeep, untap\b",
+        r"\beach player untaps\b",
+        r"\beach player may cast\b",
+        r"\beach player may put a .* card from their hand\b",
+    )
+]
+
+_FOUNTAIN_EXCLUSIONS = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\beach player sacrifices\b",
+        r"\beach player discards\b",
+        r"\beach player loses\b",
+        r"\bdestroy all\b",
+    )
+]
+
+_SPOTLIGHT_PATTERNS = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\byou and target opponent\b",
+        r"\bchoose two target players\. each of them\b",
+        r"\bdemonstrate\b",
+        r"\bassist\b",
+        r"\btarget opponent gains control\b",
+        r"\ban opponent of your choice gains control\b",
+        r"\btarget opponent creates\b",
+        r"\bchoose an opponent\. that player puts\b",
+        r"\bgift an? (?:extra|card|tapped|food|clue|treasure|token|creature|octopus)\b",
+        r"\btarget opponent draws\b",
+        r"\btarget player gains.*life\b",
+        r"\bchoose a (?:second|third) player\b",
+        r"\bchoose a player\. (?:they|that player) (?:put|draw|create|gain)\b",
+        r"\bchoose an opponent\. that player (?:returns|draws|creates|gains|puts)\b",
+        r"\btarget attacking creature.*(?:gains?|gets? \+)\b",
+        r"\bcreature (?:you don't|an opponent) controls? (?:gains?|gets? \+)\b",
+        r"\bgoad target\b",
+        r"\bgoad up to\b",
+        r"\btarget player.*phases? out\b",
+        r"\bcreature you don't control phases out\b",
+        r"\bchoose up to .* target .* phase out\b",
+    )
+]
+
+_SPOTLIGHT_EXCLUSIONS = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\bdestroy target\b",
+        r"\bexile target\b",
+        r"\bdeals?\s+\d+\s+damage to target\b",
+        r"\btarget (?:player|opponent) discards\b",
+        r"\bcounter target\b",
+    )
+]
+
+_SPOTLIGHT_EXCLUSION_EXEMPTIONS = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\bdemonstrate\b",
+        r"\bassist\b",
+        r"\bgift an? \b",
+        r"\btarget opponent gains control\b",
+    )
+]
+
+_SHADOW_PATTERNS = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\bwhenever an opponent draws.*(?:unless|pay)\b",
+        r"\bwhenever an opponent casts.*(?:unless|pay)\b",
+        r"\bwhenever a player casts their second spell\b",
+        r"\bspells your opponents cast cost.*more\b",
+        r"\bwhenever an opponent casts a spell.*draw\b",
+        r"\bwhenever an opponent draws.*(?:deals|loses)\b",
+        r"\bwhenever an opponent casts a spell, (?:they|that player) draws?\b",
+        r"\bwhenever an opponent draws a card, you\b",
+        r"\bwhenever a player taps a land.*damage\b",
+        r"\bwhenever a player taps a permanent.*damage\b",
+        r"\bcan't attack you unless\b",
+        r"\b(?:each creature|creatures) with.*counters.*can't attack you\b",
+        r"\byou and permanents you control have protection\b",
+        r"\bcreatures your opponents control enter.*tapped\b",
+    )
+]
+
+_SHADOW_DRAW_PUNISHERS = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\bwhenever an opponent draws\b",
+        r"\bwhenever an opponent casts a spell, (?:they|that player) draws?\b",
+    )
+]
+
+
+def analyze_fss_architecture(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Evaluate in-memory Oracle pattern heuristics for Fountain, Spotlight, and Shadow (Axis 1)."""
+    fountain_count = 0
+    spotlight_count = 0
+    shadow_count = 0
+    has_shadow_draw_punisher = False
+
+    for item in resolved_items:
+        card = item["card"]
+        raw_oracle = card.get("oracle_text", "")
+        if not raw_oracle:
+            continue
+        count = item["entry"]["count"]
+        # Strip reminder text in parentheses so keywords like Ward don't create false taxes
+        oracle = _FSS_REMINDER_RE.sub("", raw_oracle) if "(" in raw_oracle else raw_oracle
+
+        # Fountain evaluation
+        if not any(exc.search(oracle) for exc in _FOUNTAIN_EXCLUSIONS):
+            if any(p.search(oracle) for p in _FOUNTAIN_PATTERNS):
+                fountain_count += count
+
+        # Spotlight evaluation
+        is_exempt = any(exempt.search(oracle) for exempt in _SPOTLIGHT_EXCLUSION_EXEMPTIONS)
+        if is_exempt or not any(exc.search(oracle) for exc in _SPOTLIGHT_EXCLUSIONS):
+            if any(p.search(oracle) for p in _SPOTLIGHT_PATTERNS):
+                spotlight_count += count
+
+        # Shadow evaluation
+        if any(p.search(oracle) for p in _SHADOW_PATTERNS):
+            shadow_count += count
+            if any(p.search(oracle) for p in _SHADOW_DRAW_PUNISHERS):
+                has_shadow_draw_punisher = True
+
+    # Intensity tiers: faint (<=3), present (4-9), defining (>=10)
+    def _intensity(cnt: int) -> str:
+        if cnt >= 10:
+            return "defining"
+        elif cnt >= 4:
+            return "present"
+        return "faint"
+
+    # Barycentric coordinates (F + S + Sh = 1.0)
+    total_affordances = fountain_count + spotlight_count + shadow_count
+    if total_affordances > 0:
+        f_coord = round(fountain_count / total_affordances, 2)
+        s_coord = round(spotlight_count / total_affordances, 2)
+        sh_coord = round(1.0 - (f_coord + s_coord), 2)
+        if sh_coord < 0.0:
+            sh_coord = 0.0
+
+        coords_map = {"Fountain": f_coord, "Spotlight": s_coord, "Shadow": sh_coord}
+        max_val = max(coords_map.values())
+        top_modes = [k for k, v in coords_map.items() if v == max_val]
+        leading_mode = top_modes[0] if len(top_modes) == 1 else "Balanced"
+    else:
+        # Neutral midpoint default for lists without F/S/S affordances
+        f_coord, s_coord, sh_coord = 0.33, 0.33, 0.34
+        leading_mode = "Balanced"
+
+    # Cross-pillar synergy: Fountain-fed Shadow
+    fountain_fed_shadow = fountain_count >= 4 and has_shadow_draw_punisher
+
+    # Contextual reflection prompts based on faint dimensions & synergies
+    prompts: List[str] = []
+    if fountain_fed_shadow:
+        prompts.append(
+            "Fountain-fed Shadow detected: Generosity is engineered to feed consequences. "
+            "How will you signal this dynamic so it reads as table governance rather than a trap?"
+        )
+    if _intensity(shadow_count) == "faint" and fountain_count >= 4:
+        prompts.append(
+            "Shadow is faint in this architecture. How will you set boundaries when an opponent "
+            "pulls ahead with the resources you shared?"
+        )
+    elif _intensity(spotlight_count) == "faint" and total_affordances >= 8:
+        prompts.append(
+            "Spotlight is faint in this architecture. How will you direct attention when one player "
+            "is falling behind or needs immediate intervention?"
+        )
+    elif _intensity(fountain_count) == "faint" and total_affordances >= 8:
+        prompts.append(
+            "Fountain is faint in this architecture. How will you maintain table engagement and "
+            "loosen stalled game states without shared abundance?"
+        )
+
+    return {
+        "intensity": {
+            "fountain": _intensity(fountain_count),
+            "spotlight": _intensity(spotlight_count),
+            "shadow": _intensity(shadow_count),
+        },
+        "coordinates": {
+            "fountain": f_coord,
+            "spotlight": s_coord,
+            "shadow": sh_coord,
+        },
+        "leading_mode": leading_mode,
+        "fountain_fed_shadow_detected": fountain_fed_shadow,
+        "reflection_prompts": prompts,
+        "affordance_card_counts": {
+            "fountain": fountain_count,
+            "spotlight": spotlight_count,
+            "shadow": shadow_count,
+        },
+    }
+
+
 # ── Pillar 3: Engine Balance ("Fuel vs Payoff") ───────────────────────────
 
 _ENGINE_THEMES = [
     {
         "name": "Card Draw & Library Manipulation",
-        "enablers": ("draw a card", "draws a card", "draw an", "draws an", "draw two", "draw three", "draw cards", "draws that many", "look at the top", "draw that many"),
-        "payoffs": ("whenever you draw", "whenever a player draws", "whenever an opponent draws", "cards in your hand", "hand size"),
+        "enablers": (
+            "draw a card",
+            "draws a card",
+            "draw an",
+            "draws an",
+            "draw two",
+            "draw three",
+            "draw cards",
+            "draws that many",
+            "look at the top",
+            "draw that many",
+        ),
+        "payoffs": (
+            "whenever you draw",
+            "whenever a player draws",
+            "whenever an opponent draws",
+            "cards in your hand",
+            "hand size",
+        ),
     },
     {
         "name": "Sacrifice & Death Triggers (Aristocrats)",
         "enablers": ("sacrifice a", "sacrifices a", "sacrifice another", "sacrifice this"),
-        "payoffs": ("whenever another creature dies", "whenever a creature you control dies", "whenever a permanent is put into a graveyard"),
+        "payoffs": (
+            "whenever another creature dies",
+            "whenever a creature you control dies",
+            "whenever a permanent is put into a graveyard",
+        ),
     },
     {
         "name": "+1/+1 Counters & Growth",
         "enablers": ("put a +1/+1 counter", "puts a +1/+1 counter", "proliferate"),
-        "payoffs": ("whenever one or more +1/+1 counters", "creatures you control with +1/+1 counters", "for each counter"),
+        "payoffs": (
+            "whenever one or more +1/+1 counters",
+            "creatures you control with +1/+1 counters",
+            "for each counter",
+        ),
     },
     {
         "name": "Tokens & Swarm",
         "enablers": ("create a ", "creates a ", "create two", "create three", "token"),
-        "payoffs": ("whenever a creature token", "whenever a token enters", "for each creature you control"),
+        "payoffs": (
+            "whenever a creature token",
+            "whenever a token enters",
+            "for each creature you control",
+        ),
     },
     {
         "name": "Text & Color Alteration (Color-Hacking)",
@@ -605,6 +908,7 @@ def analyze_engine_balance(resolved_items: List[Dict[str, Any]]) -> Dict[str, An
 
 
 # ── Pillar 4: Deck Heritage & Historical Vintage ──────────────────────────
+
 
 def analyze_heritage(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Partition cards by debut vintage era: Classic (Pre-2003), Modern (2003-2014), Contemporary (2015+)."""
@@ -672,6 +976,7 @@ def analyze_heritage(resolved_items: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 # ── Format Legality & Integrity Audit ─────────────────────────────────────
 
+
 def audit_legality(
     resolved_items: List[Dict[str, Any]],
     commander_card: Optional[Dict[str, Any]] = None,
@@ -687,11 +992,24 @@ def audit_legality(
     commander_identity = set(commander_card.get("color_identity", [])) if commander_card else None
 
     basic_names = {
-        "plains", "island", "swamp", "mountain", "forest", "wastes",
-        "snow-covered plains", "snow-covered island", "snow-covered swamp",
-        "snow-covered mountain", "snow-covered forest", "relentless rats",
-        "rat colony", "shadowborn apostle", "persistent petitioners",
-        "dragon's approach", "slime against humanity", "hare apparent",
+        "plains",
+        "island",
+        "swamp",
+        "mountain",
+        "forest",
+        "wastes",
+        "snow-covered plains",
+        "snow-covered island",
+        "snow-covered swamp",
+        "snow-covered mountain",
+        "snow-covered forest",
+        "relentless rats",
+        "rat colony",
+        "shadowborn apostle",
+        "persistent petitioners",
+        "dragon's approach",
+        "slime against humanity",
+        "hare apparent",
     }
 
     card_counts: Dict[str, int] = {}
@@ -712,12 +1030,14 @@ def audit_legality(
             card_identity = set(card.get("color_identity", []))
             if not card_identity.issubset(commander_identity):
                 off_colors = sorted(list(card_identity - commander_identity))
-                color_identity_violations.append({
-                    "card": name,
-                    "off_colors": off_colors,
-                    "card_identity": sorted(list(card_identity)),
-                    "commander_identity": sorted(list(commander_identity)),
-                })
+                color_identity_violations.append(
+                    {
+                        "card": name,
+                        "off_colors": off_colors,
+                        "card_identity": sorted(list(card_identity)),
+                        "commander_identity": sorted(list(commander_identity)),
+                    }
+                )
 
     # 3. Singleton Rule check (for Commander)
     if target_format.lower() == "commander":
@@ -744,6 +1064,7 @@ def audit_legality(
 
 
 # ── Top-Level Orchestrator ────────────────────────────────────────────────
+
 
 def run_deck_analysis(
     text_or_lines: str | List[str],
@@ -779,9 +1100,13 @@ def run_deck_analysis(
         # 2. Auto-detect if there is exactly 1 Legendary Creature or Planeswalker
         if not commander_card:
             legends = [
-                item for item in resolved
+                item
+                for item in resolved
                 if "Legendary" in item["card"].get("type_line", "")
-                and ("Creature" in item["card"].get("type_line", "") or "Planeswalker" in item["card"].get("type_line", ""))
+                and (
+                    "Creature" in item["card"].get("type_line", "")
+                    or "Planeswalker" in item["card"].get("type_line", "")
+                )
                 and item["entry"]["count"] == 1
             ]
             if len(legends) == 1:
@@ -805,6 +1130,7 @@ def run_deck_analysis(
 
     mana_analysis = analyze_mana(resolved)
     table_dynamic = analyze_table_dynamic(resolved)
+    fss_architecture = analyze_fss_architecture(resolved)
     engine_balance = analyze_engine_balance(resolved)
     heritage = analyze_heritage(resolved)
     legality_audit = audit_legality(resolved, commander_card, target_format)
@@ -815,11 +1141,13 @@ def run_deck_analysis(
         orig = item.get("original_alias")
         if orig and orig.lower() not in seen_aliases:
             seen_aliases.add(orig.lower())
-            resolved_aliases.append({
-                "alias": orig,
-                "canonical": item["card"].get("name", item.get("alias_for", "")),
-                "discovered_online": item.get("discovered_online", False),
-            })
+            resolved_aliases.append(
+                {
+                    "alias": orig,
+                    "canonical": item["card"].get("name", item.get("alias_for", "")),
+                    "discovered_online": item.get("discovered_online", False),
+                }
+            )
 
     return {
         "deck_name": deck_name,
@@ -836,6 +1164,7 @@ def run_deck_analysis(
         },
         "mana_architecture": mana_analysis,
         "table_dynamic": table_dynamic,
+        "fss_architecture": fss_architecture,
         "engine_profile": engine_balance,
         "heritage": heritage,
         "legality_audit": legality_audit,

@@ -38,6 +38,14 @@ This repository is linked with notes in the **[Bacon Notes](obsidian://open?vaul
 | `01 Plan - Precompiled Flavor Alias Map.md` | 📋 Plan | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Flavor%20Alias%20Map/01%20Plan%20-%20Precompiled%20Flavor%20Alias%20Map) |
 | `02 Walkthrough - Precompiled Flavor Alias Map.md` | 🚀 Walkthrough | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Flavor%20Alias%20Map/02%20Walkthrough%20-%20Precompiled%20Flavor%20Alias%20Map) |
 
+### FSS Affordance Pattern Engine
+
+| Document | Category | Quick Link |
+| :--- | :--- | :--- |
+| `00 Reference - FSS Oracle Mechanic Taxonomy.md` | 📚 Reference | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/FSS%20Affordance%20Pattern%20Engine/00%20Reference%20-%20FSS%20Oracle%20Mechanic%20Taxonomy) |
+| `01 Plan - FSS Affordance Pattern Engine.md` | 📋 Plan | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/FSS%20Affordance%20Pattern%20Engine/01%20Plan%20-%20FSS%20Affordance%20Pattern%20Engine) |
+| `02 Walkthrough - FSS Affordance Pattern Engine.md` | 🚀 Walkthrough | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/FSS%20Affordance%20Pattern%20Engine/02%20Walkthrough%20-%20FSS%20Affordance%20Pattern%20Engine) |
+
 ### MCP Server
 
 | Document | Category | Quick Link |
@@ -59,6 +67,12 @@ This repository is linked with notes in the **[Bacon Notes](obsidian://open?vaul
 | Document | Category | Quick Link |
 | :--- | :--- | :--- |
 | `01 Plan - Oracle Command.md` | 📋 Plan | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Oracle%20Command/01%20Plan%20-%20Oracle%20Command) |
+
+### Phase 2 Development
+
+| Document | Category | Quick Link |
+| :--- | :--- | :--- |
+| `01 Phase 2 Plan - FSS Framework and Headless Engine.md` | 📋 Plan | [Open in Obsidian](obsidian://open?vault=Bacon%20Notes&file=1.%20Personal/Github%20Projects/scry-terminal/Phase%202%20Development/01%20Phase%202%20Plan%20-%20FSS%20Framework%20and%20Headless%20Engine) |
 
 ### Pip Installable
 
