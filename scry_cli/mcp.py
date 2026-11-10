@@ -160,7 +160,7 @@ TOOLS = [
             "Analyze and audit a Magic: The Gathering decklist (.txt or text lines). "
             "Returns authoritative ground-truth diagnostics across 4 dimensions: "
             "1) Vitals & Mana Health (Frank Karsten colored sources vs pip demands, early hurdles), "
-            "2) Table Dynamic (Self-focused vs Targeted vs Symmetrical table influence), "
+            "2) Table Dynamic & F/S/S Architecture (Self vs Targeted vs Symmetrical, plus Fountain/Spotlight/Shadow affordances and reflection prompts), "
             "3) Engine Balance (Fuel enablers vs Payoff reward listeners ratio), "
             "4) Deck Heritage (Classic Pre-2003, Modern 2003-2014, Contemporary 2015+), "
             "along with format legality and commander color identity verification."

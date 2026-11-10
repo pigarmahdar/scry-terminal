@@ -315,6 +315,8 @@ class TestMCPServer(unittest.TestCase):
             self.assertEqual(data["total_cards"], 1)
             self.assertIn("mana_architecture", data)
             self.assertIn("table_dynamic", data)
+            self.assertIn("fss_architecture", data)
+            self.assertIn("reflection_prompts", data["fss_architecture"])
             self.assertIn("engine_profile", data)
             self.assertIn("heritage", data)
         finally:

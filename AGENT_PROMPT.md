@@ -166,6 +166,16 @@ hallucinate a download.
     "self_pct": 38.0, "targeted_pct": 14.0, "symmetrical_pct": 48.0,
     "posture": "High Table Influence (Group Hug / Global Rules Engine)"
   },
+  "fss_architecture": {
+    "intensity": {"fountain": "defining", "spotlight": "present", "shadow": "faint"},
+    "coordinates": {"fountain": 0.58, "spotlight": 0.32, "shadow": 0.10},
+    "leading_mode": "Fountain",
+    "fountain_fed_shadow_detected": false,
+    "reflection_prompts": [
+      "Shadow is faint in this architecture. How will you set boundaries when an opponent pulls ahead with the resources you shared?"
+    ],
+    "affordance_card_counts": {"fountain": 14, "spotlight": 8, "shadow": 2}
+  },
   "engine_profile": {
     "primary_theme": "Card Draw & Library Manipulation",
     "fuel_count": 18, "payoff_count": 7, "ratio": 2.57, "diagnostic": "Stable Flow Buffer"
@@ -183,6 +193,20 @@ hallucinate a download.
 Field details for `deck`:
 - `resolved_aliases`: cards recognized under promo/flavor reskins (e.g. Universes Beyond, Godzilla, Secret Lair) mapped to their canonical Oracle card name, plus boolean `discovered_online` (true if resolved via Scryfall API and cached locally).
 - `valuation`: market pricing audit containing `usd_total` (sum of cached printing prices) and `top_expensive` (top 3 highest-value cards as `[card_name, price]` pairs).
+- `fss_architecture`: F/S/S framework affordance profile. Evaluates card Oracle text across three dimensions:
+  - **Fountain**: Symmetrical shared abundance (`each player draws`, extra lands, universal resources).
+  - **Spotlight**: Directed agency or kingmaking (`target opponent draws`, choosing a player, gifting control).
+  - **Shadow**: Consequences, taxation, and boundaries (`whenever an opponent draws`, attack restrictions, taxes).
+  - `intensity`: Tiered density for each mode (`faint` <=3 cards, `present` 4-9 cards, `defining` >=10 cards).
+  - `coordinates`: Normalized barycentric coordinates $(F, S, Sh)$ summing to 1.0 (the architectural dot).
+  - `reflection_prompts`: Contextual questions generated from faint dimensions and cross-pillar synergies.
+
+### Axis 1 (Architecture) vs. Axis 2 (Piloting) Agent Rules
+
+When assisting users with `scryfall_deck` or `scry deck`:
+1. **Treat `fss_architecture` as Axis 1 (Static Architecture).** It measures what the 100 cards provide before game start. Cards shift meaning during play (e.g., *Howling Mine* is a Fountain of abundance, but spotlighted when aiding a mana-screwed player, and a Shadow when feeding a draw punisher).
+2. **Never judge a `faint` intensity as a deck flaw.** An architecture with faint Shadow or Spotlight is not "broken" or "lacking interaction"—it represents an intentional deckbuilding posture.
+3. **Conduct an Axis 2 Piloting Reflection Interview.** Instead of blindly advising the user to add cards to balance every axis, use the emitted `reflection_prompts` to interview the pilot about their in-game strategy, table politics, and boundary enforcement.
 
 All other commands emit JSONL: zero or more card records, one per line.
 
