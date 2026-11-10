@@ -5,8 +5,6 @@ Zero external dependencies. Supports sparklines and multi-line ANSI trend curves
 import math
 import re
 
-from .state import c
-
 
 def render_sparkline(values: list[float]) -> str:
     """Render a compact 1-line sparkline from a series of numbers."""

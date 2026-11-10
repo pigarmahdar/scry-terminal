@@ -8,8 +8,8 @@ Validates:
 4. Sparklines
 """
 
-from datetime import datetime, timedelta
 import math
+from datetime import datetime, timedelta
 
 
 def render_sparkline(values: list[float]) -> str:
@@ -69,7 +69,6 @@ def render_trend_chart(
 
     # Colors
     c_reset = "\033[0m" if use_color else ""
-    c_bold = "\033[1m" if use_color else ""
     c_green = "\033[1;32m" if use_color else ""
     c_red = "\033[1;31m" if use_color else ""
     c_dim = "\033[2m" if use_color else ""
@@ -110,7 +109,6 @@ def render_trend_chart(
 
     for x in range(plot_width):
         curr_y = resampled_y[x]
-        prev_y = resampled_y[x - 1] if x > 0 else curr_y
         next_y = resampled_y[x + 1] if x < plot_width - 1 else curr_y
 
         if curr_y == next_y:

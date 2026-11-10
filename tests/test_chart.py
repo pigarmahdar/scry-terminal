@@ -4,9 +4,9 @@ import os
 import tempfile
 import unittest
 
+import scry_cli.state as state
 from scry_cli.chart import render_sparkline, render_trend_chart
 from scry_cli.store import get_price_history, record_daily_prices
-import scry_cli.state as state
 
 
 class TestChart(unittest.TestCase):

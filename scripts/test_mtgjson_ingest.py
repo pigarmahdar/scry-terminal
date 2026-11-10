@@ -5,6 +5,7 @@ import os
 import sqlite3
 import time
 
+
 def test_ingest_simulation():
     db_path = "/tmp/test_price_history.db"
     if os.path.exists(db_path):

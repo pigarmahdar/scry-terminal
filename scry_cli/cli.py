@@ -220,6 +220,7 @@ def handle_update(options=None):
     import shutil
     import time
     import urllib.request
+
     from .store import record_daily_prices
     cache_dir = os.path.dirname(ORACLE_PATH)
     os.makedirs(cache_dir, exist_ok=True)

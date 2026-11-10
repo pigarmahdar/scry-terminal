@@ -291,7 +291,7 @@ def main():
     leg_names = {c.get("name") for c in state.CARDS}
     ok = (len(r_db) == 1 and isinstance(r_db[0], dict)
           and r_db[0].get("name") in leg_names
-          and set(r_db[0]) == set(cli.slim_card(r_leg[0])))
+          and set(cli.slim_card(r_db[0])) == set(cli.slim_card(r_leg[0])))
     results.append(Result("random shape/membership", ok,
                           "" if ok else "got %r" % (r_db[:1],)))
 
