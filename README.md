@@ -196,4 +196,4 @@ Released under the [MIT License](LICENSE).
 
 ---
 
-*Built as part of grouphug.gg — a project about generosity, attention, and play.*
+*Built as part of [Kwain.gg](https://pigar.me/kwaingg) — a project about generosity, attention, and play.*
